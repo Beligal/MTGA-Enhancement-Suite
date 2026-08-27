@@ -1,4 +1,4 @@
-# MTGA Enhancement Suite Installer for Windows
+﻿# MTGA Enhancement Suite Installer for Windows
 # Usage: irm https://raw.githubusercontent.com/Beligal/MTGA-Enhancement-Suite/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
