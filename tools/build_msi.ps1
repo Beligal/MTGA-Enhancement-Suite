@@ -29,7 +29,7 @@ $wxs        = Join-Path $msiDir "MTGAPlus.wxs"
 $licenseRtf = Join-Path $msiDir "license.rtf"
 $outMsi     = Join-Path $releaseDir "MTGAPlus-Installer.msi"
 
-$bepinexTag = "v5.4.23.2"
+$bepinexTag = "v5.4.23.5"
 $bepinexVer = $bepinexTag.TrimStart('v')
 
 # --- sanity: plugin payload must already be built ---

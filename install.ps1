@@ -1,10 +1,10 @@
 # MTGA Enhancement Suite Installer for Windows
-# Usage: irm https://raw.githubusercontent.com/MayerDaniel/MTGA-Enhancement-Suite/main/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/Beligal/MTGA-Enhancement-Suite/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
-$repo = "MayerDaniel/MTGA-Enhancement-Suite"
+$repo = "Beligal/MTGA-Enhancement-Suite"
 $bepinexRepo = "BepInEx/BepInEx"
-$bepinexTag = "v5.4.23.2"
+$bepinexTag = "v5.4.23.5"
 $pluginDir = "BepInEx\plugins\MTGAEnhancementSuite"
 
 Write-Host ""

@@ -9,18 +9,31 @@ A [BepInEx 5](https://github.com/BepInEx/BepInEx) mod for **Magic: The Gathering
 
 > **Beta** — This mod is in active development. Expect rough edges.
 
+> **This is a continuation of [MTGA Enhancement Suite](https://github.com/MayerDaniel/MTGA-Enhancement-Suite) by Dan Mayer**, who built it and has stepped back from the
+> project. It is maintained here with his blessing. All credit for the original
+> work is his; releases and updates now come from this repository.
+
+### Arena on Unity 6.3
+
+Arena's 25 August 2026 update moved the client to Unity 6.3, which **crashes the
+game on startup** with older builds of the mod — before the plugin even loads, so
+there is nothing in the mod's own log to explain it. The cause is BepInEx: 5.4.23.2
+cannot hook that engine. Installing the current release (which ships BepInEx
+5.4.23.5) fixes it. If you already have the mod and Arena no longer starts, that
+is this.
+
 ## Installation (Windows)
 
 ### Installer (Recommended)
 
-Download **[MTGAPlus-Installer.msi](https://github.com/MayerDaniel/MTGA-Enhancement-Suite/releases/latest/download/MTGAPlus-Installer.msi)** from the [latest release](https://github.com/MayerDaniel/MTGA-Enhancement-Suite/releases/latest) and run it. No dependencies needed.
+Download **[MTGAPlus-Installer.msi](https://github.com/Beligal/MTGA-Enhancement-Suite/releases/latest/download/MTGAPlus-Installer.msi)** from the [latest release](https://github.com/Beligal/MTGA-Enhancement-Suite/releases/latest) and run it. No dependencies needed.
 
 ### Command-Line Install
 
 If Windows SmartScreen blocks the installer, open **PowerShell**, **CMD**, or **Windows Terminal** and run:
 
 ```
-powershell -c "irm https://raw.githubusercontent.com/MayerDaniel/MTGA-Enhancement-Suite/main/install.ps1 | iex"
+powershell -c "irm https://raw.githubusercontent.com/Beligal/MTGA-Enhancement-Suite/main/install.ps1 | iex"
 ```
 
 Both methods will:
@@ -31,8 +44,8 @@ Both methods will:
 
 ### Manual Install
 
-1. Download [BepInEx 5 x64](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.2) and extract it into your MTGA directory (`C:\Program Files\Wizards of the Coast\MTGA\`)
-2. Download `MTGAEnhancementSuite.dll`, `MTGAESBootstrapper.dll`, and `config.json` from the [latest release](https://github.com/MayerDaniel/MTGA-Enhancement-Suite/releases/latest)
+1. Download [BepInEx 5 x64](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5) and extract it into your MTGA directory (`C:\Program Files\Wizards of the Coast\MTGA\`)
+2. Download `MTGAEnhancementSuite.dll`, `MTGAESBootstrapper.dll`, and `config.json` from the [latest release](https://github.com/Beligal/MTGA-Enhancement-Suite/releases/latest)
 3. Place all three files in `<MTGA>\BepInEx\plugins\MTGAEnhancementSuite\`
 4. Launch MTGA normally
 
@@ -143,13 +156,16 @@ To fully remove BepInEx, also delete `winhttp.dll`, `doorstop_config.ini`, and t
 
 ## Building from Source
 
-Requires .NET Framework 4.7.2+ and the MTGA managed assemblies as references.
+Requires the .NET SDK and the MTGA managed assemblies as references. The plugin
+targets **netstandard 2.1**: since Unity 6.3, Arena's own assemblies are built
+against it, and a net472 target pulls in a netstandard 2.0 facade that the SDK
+prefers over any explicit reference, which fails the build (CS1705).
 
 ```bash
-dotnet build Plugin/MTGAEnhancementSuite.csproj
+dotnet build MTGAEnhancementSuite.sln -c Release
 ```
 
-The build output goes to `Plugin/bin/Debug/MTGAEnhancementSuite.dll`.
+The build output goes to `Plugin/bin/Release/MTGAEnhancementSuite.dll`.
 
 ## Architecture
 
@@ -163,4 +179,4 @@ The build output goes to `Plugin/bin/Debug/MTGAEnhancementSuite.dll`.
 
 ## License
 
-MIT
+MIT — originally by Dan Mayer, and unchanged here.
