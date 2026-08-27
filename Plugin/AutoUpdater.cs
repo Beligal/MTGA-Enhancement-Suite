@@ -165,44 +165,49 @@ namespace MTGAEnhancementSuite
                     if (!Directory.Exists(updateDir))
                         Directory.CreateDirectory(updateDir);
 
-                    // Download manifest first (if available)
-                    JObject manifest = null;
-                    if (manifestUrl != null)
+                    // Il manifest e' obbligatorio: e' l'unica cosa firmata, e senza
+                    // di lui non c'e' modo di sapere se quello che stiamo per
+                    // installare arriva da noi. Prima una release senza manifest
+                    // faceva saltare il controllo e l'aggiornamento passava lo
+                    // stesso: bastava omettere un file per annullare la firma.
+                    if (manifestUrl == null)
                     {
-                        var manifestPath = Path.Combine(updateDir, "manifest.json");
-                        DownloadFile(manifestUrl, manifestPath);
-                        var manifestJson = File.ReadAllText(manifestPath);
-                        manifest = JObject.Parse(manifestJson);
+                        downloadFailReason = "release without manifest.json — update rejected";
+                        return;
+                    }
 
-                        // Verify signature
-                        if (!VerifyManifestSignature(manifest))
-                        {
-                            downloadFailReason = "Manifest signature verification FAILED — update rejected";
-                            return;
-                        }
-                        Plugin.Log.LogInfo("AutoUpdater: Manifest signature verified");
-                    }
-                    else
+                    var manifestPath = Path.Combine(updateDir, "manifest.json");
+                    DownloadFile(manifestUrl, manifestPath);
+                    var manifest = JObject.Parse(File.ReadAllText(manifestPath));
+
+                    if (!VerifyManifestSignature(manifest))
                     {
-                        Plugin.Log.LogWarning("AutoUpdater: No manifest.json in release — skipping signature check");
+                        downloadFailReason = "Manifest signature verification FAILED — update rejected";
+                        return;
                     }
+                    Plugin.Log.LogInfo("AutoUpdater: Manifest signature verified");
 
                     // Download DLL
                     var dllPath = Path.Combine(updateDir, "MTGAEnhancementSuite.dll.pending");
                     DownloadFile(dllUrl, dllPath);
 
-                    // Verify DLL hash against manifest
-                    if (manifest != null)
+                    // L'hash del DLL e' obbligatorio quanto il manifest: e' il file
+                    // che poi viene eseguito dentro il gioco. Un manifest firmato ma
+                    // senza la sua voce significa release malformata, non "va bene".
+                    var expectedDllHash = manifest["files"]?["MTGAEnhancementSuite.dll"]?.ToString();
+                    if (expectedDllHash == null)
                     {
-                        var expectedHash = manifest["files"]?["MTGAEnhancementSuite.dll"]?.ToString();
-                        if (expectedHash != null && !VerifyFileHash(dllPath, expectedHash))
-                        {
-                            downloadFailReason = "DLL hash mismatch — update rejected";
-                            File.Delete(dllPath);
-                            return;
-                        }
-                        Plugin.Log.LogInfo("AutoUpdater: DLL hash verified");
+                        downloadFailReason = "manifest has no hash for MTGAEnhancementSuite.dll — update rejected";
+                        File.Delete(dllPath);
+                        return;
                     }
+                    if (!VerifyFileHash(dllPath, expectedDllHash))
+                    {
+                        downloadFailReason = "DLL hash mismatch — update rejected";
+                        File.Delete(dllPath);
+                        return;
+                    }
+                    Plugin.Log.LogInfo("AutoUpdater: DLL hash verified");
 
                     // Download config.json (not locked, overwrite directly)
                     if (configUrl != null)
@@ -235,18 +240,20 @@ namespace MTGAEnhancementSuite
                         var bsPath = Path.Combine(updateDir, "MTGAESBootstrapper.dll.pending");
                         DownloadFile(bootstrapperUrl, bsPath);
 
-                        if (manifest != null)
+                        // Anche questo e' codice che verra' eseguito (all'avvio, per
+                        // spostare i file al loro posto): se il manifest non lo elenca,
+                        // la release e' malformata e non la installiamo.
+                        var expectedBsHash = manifest["files"]?["MTGAESBootstrapper.dll"]?.ToString();
+                        if (expectedBsHash == null || !VerifyFileHash(bsPath, expectedBsHash))
                         {
-                            var expectedHash = manifest["files"]?["MTGAESBootstrapper.dll"]?.ToString();
-                            if (expectedHash != null && !VerifyFileHash(bsPath, expectedHash))
-                            {
-                                downloadFailReason = "Bootstrapper hash mismatch — update rejected";
-                                File.Delete(dllPath);
-                                File.Delete(bsPath);
-                                return;
-                            }
-                            Plugin.Log.LogInfo("AutoUpdater: Bootstrapper hash verified");
+                            downloadFailReason = expectedBsHash == null
+                                ? "manifest has no hash for MTGAESBootstrapper.dll — update rejected"
+                                : "Bootstrapper hash mismatch — update rejected";
+                            File.Delete(dllPath);
+                            File.Delete(bsPath);
+                            return;
                         }
+                        Plugin.Log.LogInfo("AutoUpdater: Bootstrapper hash verified");
                     }
 
                     downloadSuccess = true;
