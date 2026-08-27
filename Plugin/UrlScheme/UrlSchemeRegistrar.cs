@@ -1,6 +1,6 @@
 using System;
 using System.Diagnostics;
-using Microsoft.Win32;
+using System.Reflection;
 
 namespace MTGAEnhancementSuite.UrlScheme
 {
@@ -39,14 +39,14 @@ namespace MTGAEnhancementSuite.UrlScheme
             {
                 var exePath = Process.GetCurrentProcess().MainModule.FileName;
 
-                using (var key = Registry.CurrentUser.CreateSubKey($@"Software\Classes\{Scheme}"))
+                using (var scheme = CreateSubKey(CurrentUser(), $@"Software\Classes\{Scheme}"))
                 {
-                    key.SetValue("", $"URL:MTGA Enhancement Suite");
-                    key.SetValue("URL Protocol", "");
+                    SetValue(scheme, "", "URL:MTGA Enhancement Suite");
+                    SetValue(scheme, "URL Protocol", "");
 
-                    using (var commandKey = key.CreateSubKey(@"shell\open\command"))
+                    using (var commandKey = CreateSubKey(scheme, @"shell\open\command"))
                     {
-                        commandKey.SetValue("", $"\"{exePath}\" \"%1\"");
+                        SetValue(commandKey, "", $"\"{exePath}\" \"%1\"");
                     }
                 }
 
@@ -56,6 +56,52 @@ namespace MTGAEnhancementSuite.UrlScheme
             {
                 Plugin.Log.LogWarning($"Failed to register URL scheme: {ex.Message}");
             }
+        }
+
+        // Il registro si raggiunge per reflection, non via Microsoft.Win32.Registry.
+        //
+        // Da quando il plugin ha come target netstandard 2.1 (Unity 6.3), il
+        // compilatore risolve quel tipo su Managed\Microsoft.Win32.Registry.dll,
+        // che e' un ref assembly stub: dichiara i campi statici senza
+        // inizializzarli, quindi a runtime Registry.CurrentUser e' null e la
+        // registrazione moriva con una NullReferenceException. L'implementazione
+        // vera sta in mscorlib, che pero' non possiamo referenziare senza
+        // scontrarci con il facade netstandard. Quindi reflection su mscorlib: i
+        // RegistryKey restano object, perche' il tipo compile-time (quello dello
+        // stub) non e' quello che torna a runtime.
+        private static object CurrentUser()
+        {
+            var registry = Type.GetType("Microsoft.Win32.Registry, mscorlib");
+            if (registry == null)
+                throw new InvalidOperationException("Microsoft.Win32.Registry non trovato in mscorlib.");
+
+            var key = registry.GetField("CurrentUser", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
+            if (key == null)
+                throw new InvalidOperationException("Registry.CurrentUser nullo (assembly stub?).");
+
+            return key;
+        }
+
+        private static IDisposable CreateSubKey(object key, string path)
+        {
+            var method = key.GetType().GetMethod("CreateSubKey", new[] { typeof(string) });
+            if (method == null)
+                throw new InvalidOperationException("RegistryKey.CreateSubKey(string) non trovato.");
+
+            var sub = method.Invoke(key, new object[] { path });
+            if (sub == null)
+                throw new InvalidOperationException($"CreateSubKey ha restituito null per '{path}'.");
+
+            return (IDisposable)sub;
+        }
+
+        private static void SetValue(object key, string name, object value)
+        {
+            var method = key.GetType().GetMethod("SetValue", new[] { typeof(string), typeof(object) });
+            if (method == null)
+                throw new InvalidOperationException("RegistryKey.SetValue(string, object) non trovato.");
+
+            method.Invoke(key, new[] { name, value });
         }
 
         /// <summary>

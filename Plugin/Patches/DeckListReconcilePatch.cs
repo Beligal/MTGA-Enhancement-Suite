@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using HarmonyLib;
+using MTGAEnhancementSuite.Diagnostics;
 using MTGAEnhancementSuite.Features;
+using MTGAEnhancementSuite.Helpers;
 using Wizards.Mtga.Decks;
 
 namespace MTGAEnhancementSuite.Patches
@@ -32,14 +34,21 @@ namespace MTGAEnhancementSuite.Patches
         [HarmonyPostfix]
         private static void Postfix()
         {
+            using (FrameCost.Measure("DeckListReconcile")) PostfixCore();
+        }
+
+        private static void PostfixCore()
+        {
             try
             {
-                // Pull the live deck list from MTGA's DecksManager (same path
-                // DeckValidationPatch uses).
-                var pantryType = AccessTools.TypeByName("Pantry");
-                if (pantryType == null) return;
-                var get = pantryType.GetMethod("Get").MakeGenericMethod(typeof(DecksManager));
-                var decksManager = get.Invoke(null, null) as DecksManager;
+                // Il DecksManager passa da GameReflection.PantryGet, che tiene in
+                // cache il tipo Pantry. Qui c'era AccessTools.TypeByName("Pantry"):
+                // quel metodo, quando il nome non ha namespace, enumera *tutti* i
+                // tipi di *tutte* le assembly caricate, due volte (prima cercando
+                // per FullName, che non combacia mai, poi per Name). Con le
+                // assembly di Arena erano ~213 ms, pagati a ogni SetDecks, cioe'
+                // a ogni apertura della lista mazzi e dopo ogni salvataggio.
+                var decksManager = GameReflection.PantryGet<DecksManager>();
                 if (decksManager == null) return;
 
                 var live = decksManager.GetAllCachedDecks();

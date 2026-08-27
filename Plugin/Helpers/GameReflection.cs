@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using UnityEngine;
@@ -23,6 +24,35 @@ namespace MTGAEnhancementSuite.Helpers
     {
         private static Type _pantryType;
         private static MethodInfo _pantryGetOpen;
+        private static readonly Dictionary<string, Type> _typeCache =
+            new Dictionary<string, Type>();
+
+        /// <summary>
+        /// <c>AccessTools.TypeByName</c> con memoria.
+        ///
+        /// Quello di Harmony, quando il nome non si risolve al primo colpo,
+        /// enumera tutti i tipi di tutte le assembly caricate — e lo fa due
+        /// volte, prima confrontando FullName (che per un nome senza namespace
+        /// non combacia mai) e poi Name. Con le assembly di Arena sono ~200 ms
+        /// a chiamata: misurati 213 ms su DeckListReconcile, che scattava a
+        /// ogni apertura della lista mazzi.
+        ///
+        /// Mettiamo in cache solo i successi. Un tipo non trovato puo' vivere in
+        /// un'assembly non ancora caricata: memorizzare il fallimento lo
+        /// renderebbe introvabile per sempre, e sarebbe un bug ben peggiore di
+        /// una scansione ripetuta in un caso che gia' non funziona.
+        /// </summary>
+        public static Type TypeByName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+
+            Type cached;
+            if (_typeCache.TryGetValue(name, out cached)) return cached;
+
+            var type = AccessTools.TypeByName(name);
+            if (type != null) _typeCache[name] = type;
+            return type;
+        }
 
         /// <summary>
         /// Equivalent to <c>Pantry.Get&lt;T&gt;()</c>. Returns null if Pantry isn't

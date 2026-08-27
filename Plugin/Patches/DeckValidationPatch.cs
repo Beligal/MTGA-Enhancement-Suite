@@ -6,6 +6,7 @@ using HarmonyLib;
 using MTGAEnhancementSuite.Firebase;
 using MTGAEnhancementSuite.State;
 using MTGAEnhancementSuite.UI;
+using MTGAEnhancementSuite.Helpers;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
@@ -286,7 +287,7 @@ namespace MTGAEnhancementSuite.Patches
         private static List<DeckCard> ExtractDeckCardsByDeckId(Guid deckId)
         {
             // Use DecksManager (global namespace, concrete class) to get the deck
-            var pantryType = AccessTools.TypeByName("Pantry");
+            var pantryType = GameReflection.TypeByName("Pantry");
             if (pantryType == null) throw new Exception("Pantry type not found");
 
             // Try DecksManager first (global namespace in Core.dll)
@@ -497,7 +498,7 @@ namespace MTGAEnhancementSuite.Patches
         {
             try
             {
-                var smType = AccessTools.TypeByName("SystemMessageManager");
+                var smType = GameReflection.TypeByName("SystemMessageManager");
                 var instanceProp = AccessTools.Property(smType, "Instance");
                 var manager = instanceProp.GetValue(null);
 

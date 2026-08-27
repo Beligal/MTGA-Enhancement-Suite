@@ -1,0 +1,31 @@
+<Project>
+
+  <!--
+    Rileva automaticamente l'installazione di MTGA, con la stessa lista di
+    candidati usata da install.ps1. Override manuale possibile:
+      dotnet build -p:MTGARoot="D:\percorso\MTGA"
+  -->
+  <PropertyGroup>
+    <MTGARoot Condition="'$(MTGARoot)' == '' And Exists('$(ProgramFiles)\Wizards of the Coast\MTGA')">$(ProgramFiles)\Wizards of the Coast\MTGA</MTGARoot>
+    <MTGARoot Condition="'$(MTGARoot)' == '' And Exists('C:\Program Files (x86)\Wizards of the Coast\MTGA')">C:\Program Files (x86)\Wizards of the Coast\MTGA</MTGARoot>
+    <MTGARoot Condition="'$(MTGARoot)' == '' And Exists('C:\Program Files (x86)\Steam\steamapps\common\MTGA')">C:\Program Files (x86)\Steam\steamapps\common\MTGA</MTGARoot>
+    <MTGARoot Condition="'$(MTGARoot)' == '' And Exists('$(ProgramFiles)\Steam\steamapps\common\MTGA')">$(ProgramFiles)\Steam\steamapps\common\MTGA</MTGARoot>
+    <MTGARoot Condition="'$(MTGARoot)' == '' And Exists('C:\SteamLibrary\steamapps\common\MTGA')">C:\SteamLibrary\steamapps\common\MTGA</MTGARoot>
+    <MTGARoot Condition="'$(MTGARoot)' == '' And Exists('D:\SteamLibrary\steamapps\common\MTGA')">D:\SteamLibrary\steamapps\common\MTGA</MTGARoot>
+
+    <MTGAManaged>$(MTGARoot)\MTGA_Data\Managed</MTGAManaged>
+  </PropertyGroup>
+
+  <Target Name="VerifyMTGAPath" BeforeTargets="ResolveAssemblyReferences">
+    <Error Condition="'$(MTGARoot)' == ''"
+           Text="Installazione MTGA non trovata. Passa il percorso: dotnet build -p:MTGARoot=&quot;C:\percorso\MTGA&quot;" />
+    <Error Condition="!Exists('$(MTGAManaged)')"
+           Text="MTGARoot='$(MTGARoot)' ma manca $(MTGAManaged)." />
+  </Target>
+
+  <!-- Reference assemblies net472 senza installer né permessi admin -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" Condition="'$(TargetFramework)' == 'net472'" />
+  </ItemGroup>
+
+</Project>

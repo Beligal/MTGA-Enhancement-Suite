@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using MTGAEnhancementSuite.State;
+using MTGAEnhancementSuite.Helpers;
 
 namespace MTGAEnhancementSuite.Features
 {
@@ -108,8 +109,8 @@ namespace MTGAEnhancementSuite.Features
             {
                 if (_pantryGetAccountClient == null)
                 {
-                    var pantryType = AccessTools.TypeByName("Pantry");
-                    var accountClientType = AccessTools.TypeByName("IAccountClient");
+                    var pantryType = GameReflection.TypeByName("Pantry");
+                    var accountClientType = GameReflection.TypeByName("IAccountClient");
                     if (pantryType == null || accountClientType == null) return null;
                     _pantryGetAccountClient = pantryType.GetMethod("Get")
                         ?.MakeGenericMethod(accountClientType);

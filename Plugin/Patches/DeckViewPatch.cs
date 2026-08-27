@@ -1,5 +1,6 @@
 using System;
 using HarmonyLib;
+using MTGAEnhancementSuite.Diagnostics;
 using MTGAEnhancementSuite.State;
 using MTGAEnhancementSuite.UI;
 using UnityEngine;
@@ -52,6 +53,14 @@ namespace MTGAEnhancementSuite.Patches
         [HarmonyPostfix]
         [HarmonyPatch(typeof(DeckView), "SetDeckModel")]
         private static void SetDeckModel_Postfix(DeckView __instance)
+        {
+            // Scatta una volta per tessera: con 192 mazzi in lista sono 192
+            // chiamate di fila, ed e' il tipo di costo che si vede solo sommato.
+            using (FrameCost.Measure("DeckView.SetDeckModel"))
+                SetDeckModel_PostfixCore(__instance);
+        }
+
+        private static void SetDeckModel_PostfixCore(DeckView __instance)
         {
             try
             {

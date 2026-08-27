@@ -1,13 +1,17 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Reflection;
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
+using MTGAEnhancementSuite.Diagnostics;
 using MTGAEnhancementSuite.State;
 using MTGAEnhancementSuite.UI;
 using MTGAEnhancementSuite.UrlScheme;
+using MTGAEnhancementSuite.Helpers;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 namespace MTGAEnhancementSuite
@@ -79,6 +83,7 @@ namespace MTGAEnhancementSuite
                 Patches.BestOfPatch.Apply(_harmony);
                 Patches.CompanionDisablePatch.Apply(_harmony);
                 Patches.CardVFXPatch.Apply(_harmony);
+                Patches.ForceSimplifiedPatch.Apply(_harmony);
                 Log.LogInfo("Manual Harmony patches applied");
             }
             catch (Exception ex)
@@ -114,7 +119,13 @@ namespace MTGAEnhancementSuite
             SceneManager.sceneLoaded += OnSceneLoaded;
             StartCoroutine(PollForNavBar());
             StartCoroutine(Patches.AuthPatch.WaitForLoginAndAuth());
-            StartCoroutine(AutoUpdater.CheckForUpdate());
+            // MTGA+ (fork privato): auto-update da upstream DISATTIVATO.
+            // AutoUpdater interroga il repo MayerDaniel/MTGA-Enhancement-Suite e,
+            // se trova una release piu' recente di PluginInfo.VERSION, sovrascrive
+            // questa build con quella ufficiale. Su un fork e' esattamente il
+            // comportamento da evitare. La classe AutoUpdater resta nel progetto,
+            // riutilizzabile se un giorno vorremo aggiornare da un repo nostro.
+            // StartCoroutine(AutoUpdater.CheckForUpdate());
             StartCoroutine(Features.IconBootstrapper.EnsureIcons());
 
             // Start named pipe server for receiving URLs from other instances
@@ -131,26 +142,139 @@ namespace MTGAEnhancementSuite
         // F7 = toggle 100x fast-forward on the duel's animation queue.
         // Bound on the persistent behaviour so it works in every scene;
         // safe to mash outside a duel because Toggle() no-ops when
-        // GameManager is missing. GetKeyDown is edge-trigger so holding
-        // doesn't re-fire every frame.
+        // GameManager is missing. wasPressedThisFrame is edge-trigger so
+        // holding doesn't re-fire every frame.
         //
         // Tick() runs every frame to watch the queue and auto-stop the
         // fast-forward as soon as the backlog is drained — that's the
         // "we've caught up" signal. It also handles the failsafe case
         // where the duel scene tears down mid-fast-forward.
+        //
+        // Ogni feature gira nel proprio try: un errore in una non deve
+        // spegnere le altre. Fino al 26/08/2026 c'era un unico try attorno a
+        // tutto, e quando Arena e' passata all'Input System il primo
+        // GetKeyDown ha fatto sparire in silenzio fast-forward, timer di turno
+        // e pulsante preset. Il log gridava; l'interfaccia taceva.
         private void Update()
         {
-            try
+            // unscaledDeltaTime qui e' la durata del frame *precedente*, e i costi
+            // accumulati sono i suoi: il resoconto va stampato prima di azzerarli.
+            ReportHitchIfAny(Time.unscaledDeltaTime * 1000f);
+
+            RunFeature("Hotkeys", () =>
             {
-                if (Input.GetKeyDown(KeyCode.F7))
+                if (KeyPressed(Key.F7))
                     Features.AnimationFastForward.Toggle();
-                Features.AnimationFastForward.Tick();
-            }
-            catch (Exception ex)
+            });
+
+            RunFeature("AnimationFastForward", Features.AnimationFastForward.Tick);
+
+            // Pulsante preset a destra della barra filtri del deck editor.
+            RunFeature("DeckPresetButton", Features.DeckPresetButton.Tick);
+        }
+
+        // Arena gira con l'active input handling impostato su Input System
+        // package: la vecchia UnityEngine.Input lancia InvalidOperationException
+        // invece di rispondere. Keyboard.current e' null finche' il sistema non
+        // e' inizializzato (o se non c'e' tastiera), quindi va sempre controllato.
+        private static bool KeyPressed(Key key)
+        {
+            var keyboard = Keyboard.current;
+            return keyboard != null && keyboard[key].wasPressedThisFrame;
+        }
+
+        private void RunFeature(string name, Action body)
+        {
+            using (FrameCost.Measure(name))
             {
-                Plugin.Log.LogError($"Hotkey handler error: {ex}");
+                try
+                {
+                    body();
+                }
+                catch (Exception ex)
+                {
+                    LogFeatureError(name, ex);
+                }
             }
         }
+
+        /// <summary>
+        /// Diagnostica di fluidita'. Quando un frame supera la soglia, stampa
+        /// quanto ci abbiamo messo *noi* in quel frame, feature per feature.
+        ///
+        /// Serve a rispondere a una domanda che a occhio non si risponde: se il
+        /// client si impunta per un secondo, e' colpa nostra o di Arena? Una riga
+        /// che dice "frame da 900 ms, di cui 0,3 nostri" e' un'assoluzione, e vale
+        /// quanto la riga opposta. Silenziosa finche' non succede, e comunque non
+        /// piu' di una riga al secondo: durante i caricamenti i frame lunghi sono
+        /// la norma e non serve un muro di log.
+        /// </summary>
+        private const float HitchThresholdMs = 100f;
+        private const float HitchReportInterval = 1f;
+        private static float _nextHitchReport;
+
+        private static void ReportHitchIfAny(float frameMs)
+        {
+            if (frameMs < HitchThresholdMs || FrameCost.IsEmpty)
+            {
+                FrameCost.Clear();
+                return;
+            }
+
+            if (Time.unscaledTime < _nextHitchReport)
+            {
+                FrameCost.Clear();
+                return;
+            }
+            _nextHitchReport = Time.unscaledTime + HitchReportInterval;
+
+            string detail;
+            var ours = FrameCost.Total(out detail);
+            FrameCost.Clear();
+
+            Plugin.Log.LogInfo($"Hitch: frame {frameMs:F0} ms, nostri {ours:F2} ms{detail}");
+        }
+
+        /// <summary>
+        /// Un errore dentro Update() si ripete a ogni frame: loggarlo sempre
+        /// vuol dire 12.000 righe identiche in una sessione (successo davvero,
+        /// il 25/08/2026). Ne teniamo uno per feature al minuto, col conteggio
+        /// di quelli soppressi nel mezzo.
+        /// </summary>
+        private static void LogFeatureError(string name, Exception ex)
+        {
+            FeatureErrorState state;
+            if (!_featureErrors.TryGetValue(name, out state))
+            {
+                state = new FeatureErrorState();
+                _featureErrors[name] = state;
+            }
+
+            if (Time.unscaledTime < state.NextLog)
+            {
+                state.Suppressed++;
+                return;
+            }
+
+            var suppressed = state.Suppressed > 0
+                ? $" [+{state.Suppressed} occorrenze soppresse]"
+                : "";
+            state.Suppressed = 0;
+            state.NextLog = Time.unscaledTime + FeatureErrorLogInterval;
+
+            Plugin.Log.LogError($"{name}: {ex}{suppressed}");
+        }
+
+        private const float FeatureErrorLogInterval = 60f;
+
+        private sealed class FeatureErrorState
+        {
+            public float NextLog;
+            public int Suppressed;
+        }
+
+        private static readonly Dictionary<string, FeatureErrorState> _featureErrors =
+            new Dictionary<string, FeatureErrorState>();
 
         private void OnUrlReceivedFromPipe(string url)
         {
@@ -204,7 +328,7 @@ namespace MTGAEnhancementSuite
                 }
 
                 // Wait for challenge system to be ready in Pantry
-                var pantryType = AccessTools.TypeByName("Pantry");
+                var pantryType = GameReflection.TypeByName("Pantry");
                 Type commWrapperType = null;
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                 {
@@ -263,7 +387,7 @@ namespace MTGAEnhancementSuite
             while (pantryType == null)
             {
                 yield return new WaitForSeconds(3f);
-                pantryType = AccessTools.TypeByName("Pantry");
+                pantryType = GameReflection.TypeByName("Pantry");
             }
 
             // Wait for IChallengeCommunicationWrapper to be registered

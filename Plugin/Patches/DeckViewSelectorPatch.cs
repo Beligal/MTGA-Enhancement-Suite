@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using HarmonyLib;
 using MTGAEnhancementSuite.Features;
+using MTGAEnhancementSuite.Diagnostics;
 using MTGAEnhancementSuite.State;
 using MTGAEnhancementSuite.UI;
 using TMPro;
@@ -87,6 +88,12 @@ namespace MTGAEnhancementSuite.Patches
         [HarmonyPostfix]
         [HarmonyPatch(typeof(DeckViewSelector), "Initialize")]
         private static void Initialize_Postfix(DeckViewSelector __instance, bool simpleSelect)
+        {
+            using (FrameCost.Measure("DeckViewSelector.Initialize"))
+                Initialize_PostfixCore(__instance, simpleSelect);
+        }
+
+        private static void Initialize_PostfixCore(DeckViewSelector __instance, bool simpleSelect)
         {
             // simpleSelect is the deck-picker variant used elsewhere (e.g. in
             // challenge views) — no native folder UI, no place for ours either.
@@ -289,6 +296,11 @@ namespace MTGAEnhancementSuite.Patches
         [HarmonyPatch(typeof(DeckViewSelector), "SetDecks")]
         private static void SetDecks_Prefix(System.Collections.Generic.IReadOnlyList<DeckViewInfo> decks)
         {
+            using (FrameCost.Measure("SetDecks.Prefix")) SetDecks_PrefixCore(decks);
+        }
+
+        private static void SetDecks_PrefixCore(System.Collections.Generic.IReadOnlyList<DeckViewInfo> decks)
+        {
             _mutatedDecks.Clear();
             if (decks == null) return;
             if (DeckOrganizationManager.Folders.Count == 0) return;
@@ -316,6 +328,11 @@ namespace MTGAEnhancementSuite.Patches
         [HarmonyPostfix]
         [HarmonyPatch(typeof(DeckViewSelector), "SetDecks")]
         private static void SetDecks_Postfix()
+        {
+            using (FrameCost.Measure("SetDecks.Postfix")) SetDecks_PostfixCore();
+        }
+
+        private static void SetDecks_PostfixCore()
         {
             // Restore. MTGA may reuse the same DeckViewInfo across calls;
             // leaving our GUID on NetDeckFolderId would mislead other code.

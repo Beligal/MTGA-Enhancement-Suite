@@ -74,7 +74,7 @@ namespace MTGAEnhancementSuite.Firebase
             string mtgaVersion = ReadInstalledMtgaVersion(dbPath);
             if (string.IsNullOrEmpty(mtgaVersion))
             {
-                Plugin.Log.LogWarning("CardDbUploader: could not read MTGA version from <install>/version, skipping upload");
+                Plugin.Log.LogWarning("CardDbUploader: versione MTGA non determinabile, upload saltato");
                 yield break;
             }
 
@@ -156,16 +156,52 @@ namespace MTGAEnhancementSuite.Firebase
         // ---- Version reading & comparison ----
 
         /// <summary>
-        /// Reads <install>/version (a JSON file) and returns the highest
-        /// MTGA build version key listed under "Versions". Format like
-        /// "0.1.11950.1257485". Returns null on any error.
+        /// Returns the installed MTGA build version, e.g. "2026.62.30.14056".
+        /// Returns null if no source yields a parseable version.
+        ///
+        /// Primary source is <c>Application.version</c> (Unity's bundleVersion),
+        /// which is what Arena itself prints at startup:
+        ///   <c>Version: 2026.62.30.14056 / 2026.62.30.14056.1313448 /</c>
+        ///
+        /// It used to be read from the JSON file <c>&lt;install&gt;/version</c>, but the
+        /// Unity 6.3 build (2026-08-25) stopped shipping that file: the read failed
+        /// and the upload was skipped at every launch. The file is still tried as a
+        /// fallback, since other launchers and older installs may still have it.
+        ///
+        /// Note the numbering scheme changed with that same build, from
+        /// "0.1.11950.1257485" to "2026.62.30.14056". Comparison stays correct
+        /// because the first component grew (2026 > 0), so the new scheme sorts
+        /// above every version the server may still hold in the old one.
         /// </summary>
         private static string ReadInstalledMtgaVersion(string dbPath)
         {
-            // The version file lives at <install>/version. Two ways to find <install>:
-            //   - Application.dataPath = <install>/MTGA_Data — most reliable since we're
-            //     running inside MTGA.
-            //   - Walk up from dbPath: <install>/MTGA_Data/Downloads/Raw/Raw_*.mtga
+            try
+            {
+                var appVersion = Application.version;
+                if (ParseVersion(appVersion) != null)
+                    return appVersion;
+
+                Plugin.Log.LogInfo(
+                    $"CardDbUploader: Application.version non utilizzabile ('{appVersion}'), provo <install>/version");
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogInfo($"CardDbUploader: Application.version non leggibile ({ex.Message})");
+            }
+
+            return ReadVersionFile(dbPath);
+        }
+
+        /// <summary>
+        /// Fallback: reads the JSON at <c>&lt;install&gt;/version</c> and returns the
+        /// highest key under "Versions". Returns null on any error.
+        /// </summary>
+        private static string ReadVersionFile(string dbPath)
+        {
+            // Due modi per trovare <install>:
+            //   - Application.dataPath = <install>/MTGA_Data, il piu' affidabile
+            //     visto che giriamo dentro MTGA.
+            //   - risalendo da dbPath: <install>/MTGA_Data/Downloads/Raw/Raw_*.mtga
             try
             {
                 string installRoot = null;
@@ -179,7 +215,6 @@ namespace MTGAEnhancementSuite.Firebase
 
                 if (string.IsNullOrEmpty(installRoot) || !Directory.Exists(installRoot))
                 {
-                    // Walk up: ...\MTGA\MTGA_Data\Downloads\Raw\file.mtga -> ...\MTGA
                     var dir = Path.GetDirectoryName(dbPath);
                     for (int i = 0; i < 3 && !string.IsNullOrEmpty(dir); i++)
                         dir = Path.GetDirectoryName(dir);
@@ -192,7 +227,7 @@ namespace MTGAEnhancementSuite.Firebase
                 var versionFile = Path.Combine(installRoot, "version");
                 if (!File.Exists(versionFile))
                 {
-                    Plugin.Log.LogWarning($"CardDbUploader: version file not found at {versionFile}");
+                    Plugin.Log.LogInfo($"CardDbUploader: nessun file version in {installRoot} (atteso su build Unity 6+)");
                     return null;
                 }
 
@@ -201,7 +236,7 @@ namespace MTGAEnhancementSuite.Firebase
                 if (versions == null || !versions.Properties().Any())
                     return null;
 
-                // Pick the highest version key (in case there are multiple)
+                // Piu' di una chiave: teniamo la piu' alta.
                 string best = null;
                 long[] bestParts = null;
                 foreach (var prop in versions.Properties())

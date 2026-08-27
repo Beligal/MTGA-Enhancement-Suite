@@ -3,6 +3,7 @@ using System.Collections;
 using HarmonyLib;
 using MTGAEnhancementSuite.Firebase;
 using MTGAEnhancementSuite.UI;
+using MTGAEnhancementSuite.Helpers;
 using UnityEngine;
 
 namespace MTGAEnhancementSuite.Patches
@@ -188,10 +189,10 @@ namespace MTGAEnhancementSuite.Patches
             accountClientType = null;
             try
             {
-                var pantryType = AccessTools.TypeByName("Pantry");
+                var pantryType = GameReflection.TypeByName("Pantry");
                 if (pantryType == null) return null;
 
-                accountClientType = AccessTools.TypeByName("IAccountClient");
+                accountClientType = GameReflection.TypeByName("IAccountClient");
                 if (accountClientType == null) return null;
 
                 var getMethod = pantryType.GetMethod("Get").MakeGenericMethod(accountClientType);

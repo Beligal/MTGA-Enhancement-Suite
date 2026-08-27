@@ -21,6 +21,16 @@ namespace MTGAEnhancementSuite.State
         public bool DisableCardVFX { get; set; } = false;
 
         /// <summary>
+        /// Forza la vista semplificata delle carte: rimuove i trattamenti
+        /// grafici speciali (showcase, borderless, alt-art) mantenendo
+        /// l illustrazione. Vale sia per le carte in partita sia per la
+        /// finestra di esame. Vedi Patches/ForceSimplifiedPatch.cs.
+        /// </summary>
+        [JsonProperty("forceSimplifiedCards")]
+        public bool ForceSimplifiedCards { get; set; } = false;
+
+
+        /// <summary>
         /// LEGACY: pre-v0.19 user-defined deck folders + root-order, stored as
         /// a single shared blob. Kept for backwards compat — on first access
         /// for an account, <see cref="Features.DeckOrganizationManager"/>
@@ -42,6 +52,16 @@ namespace MTGAEnhancementSuite.State
         [JsonProperty("deckOrganizationByAccount")]
         public Dictionary<string, DeckOrganization> DeckOrganizationByAccount { get; set; }
             = new Dictionary<string, DeckOrganization>();
+
+        /// <summary>
+        /// Preset di carte riutilizzabili, inseribili in blocco in un mazzo
+        /// aperto nel deck editor. A differenza delle cartelle NON sono divisi
+        /// per account: un preset e' una semplice lista di grpId, quindi
+        /// riutilizzabile su qualunque account (fermo restando che il deck
+        /// builder rifiutera' le carte non possedute, come farebbe comunque).
+        /// </summary>
+        [JsonProperty("cardPresets")]
+        public List<CardPreset> CardPresets { get; set; } = new List<CardPreset>();
 
         public static ModSettings Instance
         {

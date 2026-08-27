@@ -1,7 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net472</TargetFramework>
+    <!-- netstandard2.1, non net472: da Unity 6.3 le assembly di Arena sono
+         compilate contro netstandard 2.1, e un target net472 porta con se'
+         il facade 2.0 che l'SDK preferisce d'ufficio a qualunque reference
+         esplicita (CS1705 su UnityEngine.ImageConversionModule). -->
+    <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>MTGAEnhancementSuite</AssemblyName>
     <RootNamespace>MTGAEnhancementSuite</RootNamespace>
     <LangVersion>latest</LangVersion>
@@ -23,84 +27,93 @@
   <!-- Game assemblies (never ship these) -->
   <ItemGroup>
     <Reference Include="SharedClientCore">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\SharedClientCore.dll</HintPath>
+      <HintPath>$(MTGAManaged)\SharedClientCore.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UnityWebRequestModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.UnityWebRequestModule.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.UnityWebRequestModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
-    <!-- UnityEngine.Input (KeyCode, GetKeyDown) lives here in modern Unity. -->
-    <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.InputLegacyModule.dll</HintPath>
+    <!-- Input System package. Da Unity 6.3 Arena ha l'active input handling
+         impostato su questo, e UnityEngine.Input (InputLegacyModule) lancia a
+         runtime: la reference legacy e' stata tolta apposta, cosi' un uso
+         accidentale non compila invece di rompersi in gioco. -->
+    <Reference Include="Unity.InputSystem">
+      <HintPath>$(MTGAManaged)\Unity.InputSystem.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Newtonsoft.Json">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(MTGAManaged)\Newtonsoft.Json.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>
 
   <ItemGroup>
+    <!-- GRE protocol types (TimerType, Phase, Step, TimerBehavior...).
+         Needed since we read duel state. -->
+    <Reference Include="Wizards.MDN.GreProtobuf">
+      <HintPath>$(MTGAManaged)\Wizards.MDN.GreProtobuf.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Core">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\Core.dll</HintPath>
+      <HintPath>$(MTGAManaged)\Core.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.UI.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.UI.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.UIModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.UIModule.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.UIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.TextRenderingModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.TextRenderingModule.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.TextRenderingModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\Unity.TextMeshPro.dll</HintPath>
+      <HintPath>$(MTGAManaged)\Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.AnimationModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.AnimationModule.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.AnimationModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="BouncyCastle.Crypto">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\BouncyCastle.Crypto.dll</HintPath>
+      <HintPath>$(MTGAManaged)\BouncyCastle.Crypto.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.AudioModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.AudioModule.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.AudioModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.ParticleSystemModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.ParticleSystemModule.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.ParticleSystemModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.ImageConversionModule">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\UnityEngine.ImageConversionModule.dll</HintPath>
+      <HintPath>$(MTGAManaged)\UnityEngine.ImageConversionModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <!-- Used by IconBootstrapper to unzip the icons asset downloaded from GitHub releases. -->
     <Reference Include="System.IO.Compression">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\System.IO.Compression.dll</HintPath>
+      <HintPath>$(MTGAManaged)\System.IO.Compression.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="System.IO.Compression.FileSystem">
-      <HintPath>C:\Program Files\Wizards of the Coast\MTGA\MTGA_Data\Managed\System.IO.Compression.FileSystem.dll</HintPath>
+      <HintPath>$(MTGAManaged)\System.IO.Compression.FileSystem.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

@@ -6,6 +6,7 @@ using HarmonyLib;
 using MTGAEnhancementSuite.Firebase;
 using MTGAEnhancementSuite.State;
 using MTGAEnhancementSuite.UI;
+using MTGAEnhancementSuite.Helpers;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -599,8 +600,8 @@ namespace MTGAEnhancementSuite.Patches
                 }
 
                 // Get player info
-                var pantryType = AccessTools.TypeByName("Pantry");
-                var accountClientType = AccessTools.TypeByName("IAccountClient");
+                var pantryType = GameReflection.TypeByName("Pantry");
+                var accountClientType = GameReflection.TypeByName("IAccountClient");
                 var getMethod = pantryType.GetMethod("Get").MakeGenericMethod(accountClientType);
                 var accountClient = getMethod.Invoke(null, null);
                 var accountInfoProp = AccessTools.Property(accountClientType, "AccountInformation");
@@ -697,8 +698,8 @@ namespace MTGAEnhancementSuite.Patches
 
             try
             {
-                var pantryType = AccessTools.TypeByName("Pantry");
-                var accountClientType = AccessTools.TypeByName("IAccountClient");
+                var pantryType = GameReflection.TypeByName("Pantry");
+                var accountClientType = GameReflection.TypeByName("IAccountClient");
                 if (pantryType == null || accountClientType == null) return;
 
                 var getMethod = pantryType.GetMethod("Get").MakeGenericMethod(accountClientType);
@@ -1199,7 +1200,7 @@ namespace MTGAEnhancementSuite.Patches
         private static IEnumerator ResolveAndInvitePlayer(string username, string pushId)
         {
             // Step 1: Resolve username → PersonaId via ISocialManager
-            var pantryType = AccessTools.TypeByName("Pantry");
+            var pantryType = GameReflection.TypeByName("Pantry");
             Type socialManagerType = null;
 
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())

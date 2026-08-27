@@ -4,6 +4,7 @@ using System.Reflection;
 using HarmonyLib;
 using MTGAEnhancementSuite.Firebase;
 using MTGAEnhancementSuite.State;
+using MTGAEnhancementSuite.Helpers;
 using UnityEngine;
 
 namespace MTGAEnhancementSuite.Patches
@@ -120,8 +121,8 @@ namespace MTGAEnhancementSuite.Patches
                             }
 
                             // Get player info from Pantry
-                            var pantryType = AccessTools.TypeByName("Pantry");
-                            var accountClientType = AccessTools.TypeByName("IAccountClient");
+                            var pantryType = GameReflection.TypeByName("Pantry");
+                            var accountClientType = GameReflection.TypeByName("IAccountClient");
                             if (pantryType != null && accountClientType != null)
                             {
                                 var getMethod = pantryType.GetMethod("Get").MakeGenericMethod(accountClientType);

@@ -5,6 +5,7 @@ using HarmonyLib;
 using MTGAEnhancementSuite.Firebase;
 using MTGAEnhancementSuite.State;
 using MTGAEnhancementSuite.UrlScheme;
+using MTGAEnhancementSuite.Helpers;
 using Newtonsoft.Json.Linq;
 using TMPro;
 using UnityEngine;
@@ -462,7 +463,7 @@ namespace MTGAEnhancementSuite.UI
             CreateToggle(_settingsContent.transform, "CompanionToggle",
                 "Disable Companions",
                 "Hides all pets/companions during matches — no rendering, animations, or sounds.",
-                new Vector2(0.05f, 0.72f), new Vector2(0.95f, 0.85f),
+                new Vector2(0.05f, 0.745f), new Vector2(0.95f, 0.850f),
                 ModSettings.Instance.DisableCompanions,
                 (val) =>
                 {
@@ -475,7 +476,7 @@ namespace MTGAEnhancementSuite.UI
             CreateToggle(_settingsContent.transform, "CardVFXToggle",
                 "Disable Card Animations",
                 "Removes flashy ETB effects, 3D model popups, and cosmetic card animations. Basic arrival sounds are kept.",
-                new Vector2(0.05f, 0.56f), new Vector2(0.95f, 0.69f),
+                new Vector2(0.05f, 0.615f), new Vector2(0.95f, 0.720f),
                 ModSettings.Instance.DisableCardVFX,
                 (val) =>
                 {
@@ -484,13 +485,27 @@ namespace MTGAEnhancementSuite.UI
                     Toast.Info(val ? "Card animations disabled" : "Card animations enabled");
                 });
 
+            // Force simplified card view toggle
+            CreateToggle(_settingsContent.transform, "ForceSimplifiedToggle",
+                "Force Simplified Cards",
+                "Always show cards without special styling (showcase, borderless, alt-art). Artwork is kept. Applies in matches and in the examine view.",
+                new Vector2(0.05f, 0.485f), new Vector2(0.95f, 0.590f),
+                ModSettings.Instance.ForceSimplifiedCards,
+                (val) =>
+                {
+                    ModSettings.Instance.ForceSimplifiedCards = val;
+                    ModSettings.Instance.Save();
+                    Toast.Info(val ? "Simplified cards on" : "Simplified cards off");
+                });
+
+
             // Export collection — opens a Windows save dialog and writes the
             // owned cards in MTGA deck-list format. Useful for backing up
             // the collection or pasting into deckbuilders.
             CreateActionRow(_settingsContent.transform, "ExportCollectionRow",
                 "Export Collection",
                 "Save your owned cards to a text file (MTGA deck format) — for sharing with deckbuilders or backing up your collection.",
-                new Vector2(0.05f, 0.40f), new Vector2(0.95f, 0.53f),
+                new Vector2(0.05f, 0.355f), new Vector2(0.95f, 0.460f),
                 "Export…",
                 () =>
                 {
@@ -1048,7 +1063,7 @@ namespace MTGAEnhancementSuite.UI
         {
             PerPlayerLog.Info($"JoinViaChallengeCommunicationWrapper: {challengeId}");
             var guidId = Guid.Parse(challengeId);
-            var pantryType = AccessTools.TypeByName("Pantry");
+            var pantryType = GameReflection.TypeByName("Pantry");
 
             // Step 1: Get IChallengeCommunicationWrapper from Pantry
             // (PVPChallengeController is NOT in Pantry, but IChallengeCommunicationWrapper IS)
@@ -1376,12 +1391,12 @@ namespace MTGAEnhancementSuite.UI
         {
             try
             {
-                var sceneLoaderType = AccessTools.TypeByName("SceneLoader");
+                var sceneLoaderType = GameReflection.TypeByName("SceneLoader");
                 var getLoaderMethod = AccessTools.Method(sceneLoaderType, "GetSceneLoader");
                 var sceneLoader = getLoaderMethod.Invoke(null, null);
                 if (sceneLoader == null) { PerPlayerLog.Warning("SceneLoader null"); return; }
 
-                var homeContextType = AccessTools.TypeByName("HomePageContext");
+                var homeContextType = GameReflection.TypeByName("HomePageContext");
                 if (homeContextType == null) { PerPlayerLog.Warning("HomePageContext type null"); return; }
 
                 var goToLanding = AccessTools.Method(sceneLoader.GetType(), "GoToLanding",
@@ -1392,7 +1407,7 @@ namespace MTGAEnhancementSuite.UI
 
                 // Set InitialBladeState = Challenge
                 var bladeStateField = AccessTools.Field(homeContextType, "InitialBladeState");
-                var pbcType = AccessTools.TypeByName("PlayBladeController");
+                var pbcType = GameReflection.TypeByName("PlayBladeController");
                 var statesType = pbcType?.GetNestedType("PlayBladeVisualStates");
                 if (bladeStateField != null && statesType != null)
                 {
@@ -1419,12 +1434,12 @@ namespace MTGAEnhancementSuite.UI
         {
             try
             {
-                var sceneLoaderType = AccessTools.TypeByName("SceneLoader");
+                var sceneLoaderType = GameReflection.TypeByName("SceneLoader");
                 var getLoaderMethod = AccessTools.Method(sceneLoaderType, "GetSceneLoader");
                 var sceneLoader = getLoaderMethod.Invoke(null, null);
                 if (sceneLoader == null) return;
 
-                var homeContextType = AccessTools.TypeByName("HomePageContext");
+                var homeContextType = GameReflection.TypeByName("HomePageContext");
                 if (homeContextType == null) return;
 
                 var goToLanding = AccessTools.Method(sceneLoader.GetType(), "GoToLanding",
@@ -1466,7 +1481,7 @@ namespace MTGAEnhancementSuite.UI
             // Access it via IChallengeCommunicationWrapper from Pantry instead.
             try
             {
-                var pantryType = AccessTools.TypeByName("Pantry");
+                var pantryType = GameReflection.TypeByName("Pantry");
                 Type commWrapperType = null;
                 foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
                     foreach (var t in asm.GetTypes())
@@ -1533,7 +1548,7 @@ namespace MTGAEnhancementSuite.UI
         {
             try
             {
-                var socialUIType = AccessTools.TypeByName("SocialUI");
+                var socialUIType = GameReflection.TypeByName("SocialUI");
                 if (socialUIType == null)
                 {
                     PerPlayerLog.Warning("SocialUI type not found");
@@ -1571,7 +1586,7 @@ namespace MTGAEnhancementSuite.UI
         {
             try
             {
-                var sceneLoaderType = AccessTools.TypeByName("SceneLoader");
+                var sceneLoaderType = GameReflection.TypeByName("SceneLoader");
                 var getLoaderMethod = AccessTools.Method(sceneLoaderType, "GetSceneLoader");
                 var sceneLoader = getLoaderMethod.Invoke(null, null);
                 if (sceneLoader == null) return false;
@@ -1907,7 +1922,7 @@ namespace MTGAEnhancementSuite.UI
             PerPlayerLog.Info($"Challenge created: {challengeId}");
 
             // Step 4: Navigate to the challenge view via SocialUI.OpenPlayBlade(Guid)
-            var socialUIType = AccessTools.TypeByName("SocialUI");
+            var socialUIType = GameReflection.TypeByName("SocialUI");
             if (socialUIType == null)
             {
                 PerPlayerLog.Error("SocialUI type not found");

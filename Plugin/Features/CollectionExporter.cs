@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using HarmonyLib;
 using MTGAEnhancementSuite.Firebase;
 using MTGAEnhancementSuite.UI;
+using MTGAEnhancementSuite.Helpers;
 using UnityEngine;
 
 namespace MTGAEnhancementSuite.Features
@@ -420,7 +421,7 @@ namespace MTGAEnhancementSuite.Features
         private static object ResolveInventoryWrapper(out Type wrapperType)
         {
             wrapperType = null;
-            var pantryType = AccessTools.TypeByName("Pantry");
+            var pantryType = GameReflection.TypeByName("Pantry");
             if (pantryType == null) return null;
 
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
@@ -462,7 +463,7 @@ namespace MTGAEnhancementSuite.Features
         /// </summary>
         private static object ResolveInventoryManager()
         {
-            var wrapperControllerType = AccessTools.TypeByName("WrapperController");
+            var wrapperControllerType = GameReflection.TypeByName("WrapperController");
             if (wrapperControllerType == null) return null;
             var instanceProp = AccessTools.Property(wrapperControllerType, "Instance");
             var wc = instanceProp?.GetValue(null);
@@ -473,7 +474,7 @@ namespace MTGAEnhancementSuite.Features
 
         private static object ResolveCardDatabase()
         {
-            var pantryType = AccessTools.TypeByName("Pantry");
+            var pantryType = GameReflection.TypeByName("Pantry");
             if (pantryType == null) return null;
 
             Type cardDbType = null;

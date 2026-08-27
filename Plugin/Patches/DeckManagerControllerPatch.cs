@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using MTGAEnhancementSuite.Features;
+using MTGAEnhancementSuite.Helpers;
 using MTGAEnhancementSuite.State;
 using MTGAEnhancementSuite.UI;
 using TMPro;
@@ -478,9 +479,9 @@ namespace MTGAEnhancementSuite.Patches
             foreach (var id in localIds) Features.LocalDeckStore.Delete(id);
             if (localIds.Count > 0) DeckViewSelectorPatch.RebuildLocalDecks();
 
-            var pantryType = AccessTools.TypeByName("Pantry");
-            var get = pantryType.GetMethod("Get").MakeGenericMethod(typeof(DecksManager));
-            var dm = get.Invoke(null, null);
+            // Vedi DeckListReconcilePatch: TypeByName("Pantry") scansiona tutte
+            // le assembly caricate. PantryGet la fa una volta sola per sessione.
+            var dm = GameReflection.PantryGet<DecksManager>();
             if (dm == null)
             {
                 Plugin.Log.LogWarning("Bulk delete: DecksManager not in Pantry");
