@@ -32,7 +32,7 @@ namespace MTGAEnhancementSuite.Features
     internal static class IconBootstrapper
     {
         private const string IconsZipUrl =
-            "https://github.com/MayerDaniel/MTGA-Enhancement-Suite/releases/latest/download/icons.zip";
+            "https://github.com/Beligal/MTGA-Enhancement-Suite/releases/latest/download/icons.zip";
 
         // The full set of icon files the plugin ships. If any of these is
         // missing locally we re-download the zip. Keep in sync with assets/icons/.

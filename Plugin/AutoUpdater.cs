@@ -19,11 +19,22 @@ namespace MTGAEnhancementSuite
     /// </summary>
     internal static class AutoUpdater
     {
-        private const string GitHubApiUrl = "https://api.github.com/repos/MayerDaniel/MTGA-Enhancement-Suite/releases/latest";
+        // Le release del fork. L'indirizzo e' compilato dentro il DLL che
+        // l'utente ha installato: cambiarlo raggiunge solo chi installa una
+        // build nuova, non chi ha gia' una versione vecchia in giro.
+        private const string GitHubApiUrl = "https://api.github.com/repos/Beligal/MTGA-Enhancement-Suite/releases/latest";
         private static readonly Version CurrentVersion = new Version(PluginInfo.VERSION);
 
-        // Ed25519 public key for verifying release signatures (base64-encoded raw 32 bytes)
-        private const string PublicKeyBase64 = "hzrpXE+qhCu3qoNpkPGnvtvoqKZb9vusP0wuOrWvlWQ=";
+        // Chiave pubblica Ed25519 con cui si verifica la firma del manifest
+        // (base64 dei 32 byte grezzi). La meta' privata sta in signing_key.pem,
+        // fuori dal repository: senza quella non si puo' pubblicare nulla che
+        // queste installazioni accettino, e per lo stesso motivo nessun altro
+        // puo' spacciare un aggiornamento per nostro.
+        //
+        // Questa e' la chiave del fork, diversa da quella di MayerDaniel: le
+        // installazioni nate dalle sue release rifiutano cio' che firmiamo noi,
+        // e viceversa. Il passaggio da una all'altra si fa reinstallando.
+        private const string PublicKeyBase64 = "QFBVvAx7+8L/wyS9X6iubH5Sn3ezZuz1KbUc3BGlrLk=";
 
         public static IEnumerator CheckForUpdate()
         {

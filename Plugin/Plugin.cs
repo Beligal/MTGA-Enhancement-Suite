@@ -119,13 +119,14 @@ namespace MTGAEnhancementSuite
             SceneManager.sceneLoaded += OnSceneLoaded;
             StartCoroutine(PollForNavBar());
             StartCoroutine(Patches.AuthPatch.WaitForLoginAndAuth());
-            // MTGA+ (fork privato): auto-update da upstream DISATTIVATO.
-            // AutoUpdater interroga il repo MayerDaniel/MTGA-Enhancement-Suite e,
-            // se trova una release piu' recente di PluginInfo.VERSION, sovrascrive
-            // questa build con quella ufficiale. Su un fork e' esattamente il
-            // comportamento da evitare. La classe AutoUpdater resta nel progetto,
-            // riutilizzabile se un giorno vorremo aggiornare da un repo nostro.
-            // StartCoroutine(AutoUpdater.CheckForUpdate());
+            // Auto-update dalle release del fork (Beligal/MTGA-Enhancement-Suite),
+            // firmate con la nostra chiave. Era disattivato finche' puntava a
+            // upstream, perche' avrebbe sovrascritto questa build con quella
+            // ufficiale a ogni avvio.
+            //
+            // Finche' il repo non ha release, GitHub risponde 404: la richiesta
+            // fallisce, viene loggata una riga di warning e non succede altro.
+            StartCoroutine(AutoUpdater.CheckForUpdate());
             StartCoroutine(Features.IconBootstrapper.EnsureIcons());
 
             // Start named pipe server for receiving URLs from other instances
