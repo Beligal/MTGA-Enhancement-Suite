@@ -53,7 +53,12 @@ Both methods will:
 
 ## Installation (Linux)
 ### 1. Install BepInEx (Windows x64)
-   + Download the Windows x64 version of BepInEx (do NOT use Linux or x86 builds).
+   + Download **[BepInEx 5.4.23.5 win_x64](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5)**
+     — the Windows x64 build, *not* the Linux or x86 ones. Under Proton the game runs
+     as a Windows application, so it needs the Windows build.
+   + The version matters: 5.4.23.2 and earlier crash Arena on startup since the
+     Unity 6.3 update, and the crash happens before the mod loads, so nothing in
+     the mod's log explains it.
    + Extract all contents into the MTGA installation directory: `~/.../steamapps/common/MTGA/`
 
 After extraction, the directory should include:
