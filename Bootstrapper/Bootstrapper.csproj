@@ -5,6 +5,21 @@
     <AssemblyName>MTGAESBootstrapper</AssemblyName>
     <RootNamespace>MTGAESBootstrapper</RootNamespace>
     <LangVersion>latest</LangVersion>
+    <!-- Versione dell'assembly, non solo della mod.
+
+         Windows Installer non sostituisce un file la cui versione e' uguale o
+         inferiore a quella gia' installata. Senza queste righe ogni build usciva
+         come 1.0.0.0, identica alla precedente, e l'MSI aggiornava BepInEx ma
+         lasciava intatta la mod: un utente che gia' l'aveva restava con quella
+         vecchia senza nessun avviso.
+
+         Sta nello spazio 1.x e non 0.19 perche' le build passate hanno gia'
+         spedito 1.0.0.0: partire da 0.19.0.0 sarebbe un numero piu' basso, e
+         l'installatore rifiuterebbe l'aggiornamento per la stessa ragione. La
+         versione pubblica della mod resta quella in PluginInfo.VERSION. -->
+    <Version>1.19.0</Version>
+    <FileVersion>1.19.0.0</FileVersion>
+    <AssemblyVersion>1.19.0.0</AssemblyVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
