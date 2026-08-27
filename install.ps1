@@ -97,10 +97,33 @@ if ($mtgaProcess) {
     exit 1
 }
 
-# Step 3: Install BepInEx 5 if not present
+# Step 3: Install or upgrade BepInEx 5
+#
+# Checking only whether winhttp.dll exists is not enough. Arena moved to
+# Unity 6.3 in August 2026, and BepInEx 5.4.23.2 crashes the game on startup
+# under that engine. Anyone who already had the mod has that version, so
+# "already installed" would leave them with a game that will not launch --
+# which is exactly the case this script has to fix. Compare the version.
 $doorstop = Join-Path $mtgaPath "winhttp.dll"
-if (-not (Test-Path $doorstop)) {
-    Write-Host "Installing BepInEx 5..." -ForegroundColor Yellow
+$bepinexCore = Join-Path $mtgaPath "BepInEx\core\BepInEx.dll"
+
+$installedVersion = $null
+if (Test-Path $bepinexCore) {
+    try { $installedVersion = [version](Get-Item $bepinexCore).VersionInfo.FileVersion } catch { }
+}
+$requiredVersion = [version]$bepinexTag.TrimStart("v")
+
+$needsBepInEx = (-not (Test-Path $doorstop)) -or
+                ($null -eq $installedVersion) -or
+                ($installedVersion -lt $requiredVersion)
+
+if ($needsBepInEx) {
+    if ($installedVersion) {
+        Write-Host "Upgrading BepInEx $installedVersion -> $requiredVersion..." -ForegroundColor Yellow
+        Write-Host "  (5.4.23.2 crashes Arena on Unity 6.3; your plugins and settings are kept.)" -ForegroundColor Gray
+    } else {
+        Write-Host "Installing BepInEx 5..." -ForegroundColor Yellow
+    }
 
     $bepinexUrl = "https://github.com/$bepinexRepo/releases/download/$bepinexTag/BepInEx_win_x64_$($bepinexTag.TrimStart('v')).zip"
     $zipPath = Join-Path $env:TEMP "bepinex.zip"
@@ -115,7 +138,7 @@ if (-not (Test-Path $doorstop)) {
 
     Write-Host "  BepInEx 5 installed." -ForegroundColor Green
 } else {
-    Write-Host "BepInEx already installed." -ForegroundColor Green
+    Write-Host "BepInEx $installedVersion already up to date." -ForegroundColor Green
 }
 
 # Step 4: Download latest plugin release
