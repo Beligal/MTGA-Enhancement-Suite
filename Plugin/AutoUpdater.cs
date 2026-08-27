@@ -277,6 +277,24 @@ namespace MTGAEnhancementSuite
             }
             else
             {
+                // Ripulire non e' cortesia: e' necessario. I file scaricati si
+                // chiamano *.pending, e al prossimo avvio il bootstrapper mette al
+                // loro posto *qualunque* .pending trovi, senza guardarci dentro. Se
+                // la rete cade a meta' download il file resta li' troncato, e le
+                // uscite controllate qui sopra non lo coprono: cancellarlo per
+                // eccezione e' l'unico punto che le copre tutte.
+                try
+                {
+                    if (Directory.Exists(updateDir))
+                        Directory.Delete(updateDir, true);
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.LogWarning(
+                        $"AutoUpdater: could not clean up {updateDir}: {ex.Message}. " +
+                        "Delete it by hand before restarting, or a partial download may be installed.");
+                }
+
                 Toast.Warning("Failed to download MTGA+ update.");
                 Plugin.Log.LogError($"AutoUpdater: Update failed: {downloadFailReason}");
             }
