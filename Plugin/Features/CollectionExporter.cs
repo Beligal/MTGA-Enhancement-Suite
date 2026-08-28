@@ -8,7 +8,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using HarmonyLib;
-using MTGAEnhancementSuite.Firebase;
 using MTGAEnhancementSuite.UI;
 using MTGAEnhancementSuite.Helpers;
 using UnityEngine;
@@ -51,9 +50,20 @@ namespace MTGAEnhancementSuite.Features
                 }
 
                 // No local cache — pull from server first.
+                //
+                // I dati arrivano da Arena (InventoryManager.RefreshCards), non
+                // da Firebase: qui serve solo un MonoBehaviour vivo su cui far
+                // girare la coroutine. Usiamo quello persistente del plugin.
                 Plugin.Log.LogInfo("CollectionExporter: no cached cards, fetching from server");
+                var host = PluginBehaviour.Instance;
+                if (host == null)
+                {
+                    Plugin.Log.LogError("CollectionExporter: PluginBehaviour non disponibile, impossibile avviare il fetch");
+                    Toast.Error("Export failed: plugin not ready");
+                    return;
+                }
                 Toast.Info("Fetching collection from server…");
-                FirebaseClient.Instance.StartCoroutine(FetchThenExport());
+                host.StartCoroutine(FetchThenExport());
             }
             catch (Exception ex)
             {

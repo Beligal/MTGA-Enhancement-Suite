@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 Signs release files and produces a manifest.json with SHA-256 hashes
 and an Ed25519 signature. Upload manifest.json alongside release assets.
@@ -28,7 +28,6 @@ DEFAULT_KEY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "signing_
 RELEASE_FILES = [
     "MTGAEnhancementSuite.dll",
     "MTGAESBootstrapper.dll",
-    "config.json",
 ]
 
 

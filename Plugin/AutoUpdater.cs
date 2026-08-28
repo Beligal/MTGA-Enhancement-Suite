@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.IO;
 using System.Net;
@@ -128,7 +128,6 @@ namespace MTGAEnhancementSuite
             }
 
             string dllUrl = null;
-            string configUrl = null;
             string bootstrapperUrl = null;
             string manifestUrl = null;
 
@@ -137,7 +136,6 @@ namespace MTGAEnhancementSuite
                 var name = asset["name"]?.ToString();
                 var url = asset["browser_download_url"]?.ToString();
                 if (name == "MTGAEnhancementSuite.dll") dllUrl = url;
-                else if (name == "config.json") configUrl = url;
                 else if (name == "MTGAESBootstrapper.dll") bootstrapperUrl = url;
                 else if (name == "manifest.json") manifestUrl = url;
             }
@@ -208,31 +206,6 @@ namespace MTGAEnhancementSuite
                         return;
                     }
                     Plugin.Log.LogInfo("AutoUpdater: DLL hash verified");
-
-                    // Download config.json (not locked, overwrite directly)
-                    if (configUrl != null)
-                    {
-                        var configTempPath = Path.Combine(updateDir, "config.json.tmp");
-                        DownloadFile(configUrl, configTempPath);
-
-                        if (manifest != null)
-                        {
-                            var expectedHash = manifest["files"]?["config.json"]?.ToString();
-                            if (expectedHash != null && !VerifyFileHash(configTempPath, expectedHash))
-                            {
-                                downloadFailReason = "config.json hash mismatch — update rejected";
-                                File.Delete(dllPath);
-                                File.Delete(configTempPath);
-                                return;
-                            }
-                            Plugin.Log.LogInfo("AutoUpdater: config.json hash verified");
-                        }
-
-                        // Move to final location
-                        var configFinalPath = Path.Combine(pluginDir, "config.json");
-                        File.Copy(configTempPath, configFinalPath, true);
-                        File.Delete(configTempPath);
-                    }
 
                     // Download bootstrapper (if available)
                     if (bootstrapperUrl != null)

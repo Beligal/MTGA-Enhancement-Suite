@@ -7,11 +7,10 @@
   MSI BUNDLES everything and lays it down declaratively:
 
     - BepInEx 5 (the winhttp.dll doorstop + BepInEx/core) into the MTGA folder
-    - The MTGA+ plugin (DLLs + config + icons) into BepInEx/plugins
-    - The mtgaes:// URL-scheme registry entries (HKCR, per-machine)
+    - The MTGA+ plugin (DLLs + icons) into BepInEx/plugins
 
-  No network access, no script execution at install time -> a plain file +
-  registry MSI that AV engines don't flag. The plugin's built-in auto-updater
+  No network access, no script execution at install time -> a plain file MSI
+  that AV engines don't flag. The plugin's built-in auto-updater
   pulls newer releases after install, so the bundled DLLs only need to be a
   recent build.
 
@@ -106,22 +105,17 @@
       <Files Include="$(StageDir)\**" />
     </ComponentGroup>
 
-    <!-- mtgaes:// URL scheme. HKCR under a per-machine package resolves to
-         HKLM\Software\Classes, so it's registered for every user. The command
-         points at MTGA.exe in the chosen folder. -->
-    <Component Id="UrlScheme" Directory="INSTALLFOLDER" Guid="b2c3d4e5-6f70-4811-9a2b-3c4d5e6f7081">
-      <RegistryKey Root="HKCR" Key="mtgaes">
-        <RegistryValue Type="string" Value="URL:MTGA Enhancement Suite" />
-        <RegistryValue Type="string" Name="URL Protocol" Value="" />
-        <RegistryKey Key="shell\open\command">
-          <RegistryValue Type="string" Value="&quot;[INSTALLFOLDER]MTGA.exe&quot; &quot;%1&quot;" />
-        </RegistryKey>
-      </RegistryKey>
-    </Component>
+    <!-- Lo schema URL mtgaes:// e' stato rimosso il 2026-08-28 insieme alle
+         lobby private: non c'e' piu' niente che sappia gestire quei link.
+         Il componente scriveva HKCR\mtgaes che, in un pacchetto per-macchina,
+         finisce in HKLM\Software\Classes. Eliminandolo di qui, Windows
+         Installer rimuove la chiave da solo durante l'aggiornamento — ma solo
+         per chi aggiorna dall'MSI. Per chi passa dall'aggiornatore automatico
+         la chiave HKLM resta, inerte, e il plugin non ha i permessi per
+         toglierla; quella per-utente (HKCU) la cancella lui all'avvio. -->
 
     <Feature Id="Main" Title="MTGA+">
       <ComponentGroupRef Id="PayloadFiles" />
-      <ComponentRef Id="UrlScheme" />
     </Feature>
 
     <!-- Install-directory wizard (Welcome -> License -> Choose folder ->

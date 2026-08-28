@@ -3,9 +3,12 @@
 <img width="256" height="256" alt="a_plus" src="https://github.com/user-attachments/assets/39dbf120-a7ff-4bff-aa3f-6cf236bca393" />
 
 
-[Discord](https://discord.gg/67NhSegmvs)
+A [BepInEx 5](https://github.com/BepInEx/BepInEx) mod for **Magic: The Gathering Arena** (Windows) that adds deck- and collection-management tools Wizards of the Coast hasn't built into the game.
 
-A [BepInEx 5](https://github.com/BepInEx/BepInEx) mod for **Magic: The Gathering Arena** (Windows) that adds community features Wizards of the Coast hasn't built into the game.
+Everything it does runs on your own machine: no account, no server, no network
+calls of its own beyond checking this repository for updates.
+
+Bugs and questions: **[open an issue](https://github.com/Beligal/MTGA-Enhancement-Suite/issues)**.
 
 > **Beta** — This mod is in active development. Expect rough edges.
 
@@ -40,13 +43,12 @@ Both methods will:
 1. Find your MTGA installation
 2. Install BepInEx 5 (if not already present)
 3. Download the latest plugin release
-4. Register the `mtgaes://` URL scheme for invite links
 
 ### Manual Install
 
 1. Download [BepInEx 5 x64](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.5) and extract it into your MTGA directory (`C:\Program Files\Wizards of the Coast\MTGA\`)
-2. Download `MTGAEnhancementSuite.dll`, `MTGAESBootstrapper.dll`, and `config.json` from the [latest release](https://github.com/Beligal/MTGA-Enhancement-Suite/releases/latest)
-3. Place all three files in `<MTGA>\BepInEx\plugins\MTGAEnhancementSuite\`
+2. Download `MTGAEnhancementSuite.dll` and `MTGAESBootstrapper.dll` from the [latest release](https://github.com/Beligal/MTGA-Enhancement-Suite/releases/latest)
+3. Place both files in `<MTGA>\BepInEx\plugins\MTGAEnhancementSuite\`
 4. Launch MTGA normally
 
 > **Note:** The bootstrapper handles auto-updates. Future updates will be downloaded automatically and applied on next restart.
@@ -95,8 +97,7 @@ Place the MTGA+ plugin files into:
 `BepInEx/plugins/MTGAEnhancementSuite/`
 
 Files should include:
-+ provided `.dll` files
-+ `config.json` (from the MTGA+ release)
++ the provided `.dll` files
 
 
 ### 5. Launch the Game
@@ -123,32 +124,43 @@ Ensure you are using a working Proton version (Proton Experimental or recent sta
 
 ## Features
 
-### Custom Format Lobbies
-Create challenge lobbies with format rules (currently **Pauper (Paper Banlist)**, **Historic Pauper**, **Standard Pauper**, **Planar Standard**, and **Modern**). When a player selects a deck, it is validated against the format's legal card list — illegal decks are rejected with a message showing which cards aren't allowed. Format rules are synced between host and joiner in real-time via Firebase, and backed by Scryfall.
+### Card Presets
+Save any set of cards from the deck builder and drop it into another deck later —
+a mana base, a sideboard package, a shell you keep coming back to. The gold
+button to the right of the deck editor's filter bar saves the current list and
+reopens it anywhere.
 
-### Lobby Invite Links
-Share a clickable `https://` link to your lobby. The recipient's browser opens a landing page that launches MTGA and joins the lobby automatically — no friend request needed. If MTGA is already running, the link is forwarded to the existing instance.
+### Deck Folders and Local Decks
+Group your decks into folders, reorder them, and select several at once to move
+or delete them in bulk. Local decks live as plain text files on your machine
+(`%APPDATA%\MTGAEnhancementSuite\localdecks`), so you can keep more decks than
+Arena's own limit and edit them outside the game.
 
-### Public Lobby Browser
-Mark your lobby as public and it appears in a server browser visible to all Enhancement Suite users. Browse open lobbies, filter by format, see the host name and Bo1/Bo3 setting, and join with one click.
-
-### Format Sync Across Matches
-When a lobby host changes the format, the joiner's client updates automatically. Format settings persist across rematches — play multiple games in the same lobby without re-configuring.
+### Collection Export
+Writes your whole collection to a text file in Arena's deck-list format
+(`4 Card Name (SET) 123`), ready to paste into a deckbuilding site or keep as a
+backup. In the **MTGA+** panel, under Settings.
 
 ### Gameplay Settings
-Click the **MTGA+** button and switch to the **Settings** tab to access:
+Click the **MTGA+** button in the navigation bar to open the panel:
 - **Disable Companions** — Hides all pets/companions during matches. No rendering, animations, or sounds.
 - **Disable Card Animations** — Removes flashy ETB effects, 3D model popups, and cosmetic card animations. Basic arrival sounds and card draw trajectories are preserved.
+- **Force Simplified Cards** — Always draws cards without special treatments (showcase, borderless, alternate art). The artwork is kept. Applies both in matches and in the examine view.
 
 Settings are saved automatically and persist across game restarts.
+
+### Animation Fast-Forward
+Press **F7** during a match to run the animation queue at 100× until it has caught
+up. Useful when a long chain of triggers is playing out and you already know the
+outcome. It stops on its own once the backlog is drained.
 
 ## Usage
 
 1. Launch MTGA — you should see an **MTGA+** button in the top navigation bar
-2. Open your **Friends List** and click the **Challenge** button in the top right
-3. Use the **format selector** below the coin flip spinner to choose a format
-4. Click **Copy Link** to get a shareable invite, or **Make Public** to list in the server browser
-5. Click the **MTGA+** button to browse public lobbies or access settings
+2. Click it to open the panel: gameplay settings and **Export Collection**
+3. In the deck builder, the gold button to the right of the filter bar handles **card presets**
+4. In the deck list, right-click a **folder header** for folder actions, or select several decks for bulk move and delete
+5. Press **F7** in a match to fast-forward animations
 
 ## Uninstalling
 
@@ -178,9 +190,16 @@ The build output goes to `Plugin/bin/Release/MTGAEnhancementSuite.dll`.
 |-------|-----------|
 | Mod framework | BepInEx 5 (Mono) |
 | Patching | HarmonyX |
-| Backend | Firebase Realtime Database + Cloud Functions |
-| Card validation | Scryfall API (daily sync to Firebase) |
-| URL handling | Custom `mtgaes://` scheme + TCP IPC |
+| Target framework | netstandard 2.1 (matches Arena since Unity 6.3) |
+| Storage | Plain JSON and text files, local to your machine |
+| Network | GitHub releases, for update checks only |
+
+The mod has **no backend**. Earlier versions (up to 0.19.0) ran private lobbies,
+a public lobby browser, custom formats and `mtgaes://` invite links on a Firebase
+project belonging to the original author; that service was his, and it went with
+him. All of it was removed in 0.20.0, and the mod now does its work entirely on
+your machine. Updating from an older version also clears out what it left behind:
+the leftover `config.json` and the `mtgaes` registry entry.
 
 ## License
 

@@ -1,6 +1,0 @@
-{
-  "ApiKey": "YOUR_FIREBASE_API_KEY",
-  "DatabaseUrl": "https://mtga-enhancement-suite-default-rtdb.firebaseio.com",
-  "FunctionUrl": "https://us-central1-mtga-enhancement-suite.cloudfunctions.net",
-  "ProjectId": "mtga-enhancement-suite"
-}

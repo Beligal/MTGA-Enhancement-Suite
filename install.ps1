@@ -148,7 +148,6 @@ $releaseUrl = "https://api.github.com/repos/$repo/releases/latest"
 try {
     $release = Invoke-RestMethod -Uri $releaseUrl -UseBasicParsing
     $dllAsset = $release.assets | Where-Object { $_.name -eq "MTGAEnhancementSuite.dll" }
-    $configAsset = $release.assets | Where-Object { $_.name -eq "config.json" }
     $bootstrapperAsset = $release.assets | Where-Object { $_.name -eq "MTGAESBootstrapper.dll" }
     $manifestAsset = $release.assets | Where-Object { $_.name -eq "manifest.json" }
     $iconsAsset = $release.assets | Where-Object { $_.name -eq "icons.zip" }
@@ -211,25 +210,6 @@ if ($manifest) {
 }
 Write-Host "  Plugin DLL installed." -ForegroundColor Green
 
-# Download config.json if available and not already present
-$configPath = Join-Path $pluginPath "config.json"
-if ($configAsset -and -not (Test-Path $configPath)) {
-    Write-Host "  Downloading config.json..."
-    Invoke-WebRequest -Uri $configAsset.browser_download_url -OutFile $configPath -UseBasicParsing
-    if ($manifest) {
-        $expectedHash = $manifest.files.'config.json'
-        if (-not (Test-FileHash $configPath $expectedHash)) {
-            Remove-Item $configPath -Force -ErrorAction SilentlyContinue
-            Write-Host "Config integrity check failed. Aborting." -ForegroundColor Red
-            exit 1
-        }
-        Write-Host "  Config hash verified." -ForegroundColor Green
-    }
-    Write-Host "  Config installed." -ForegroundColor Green
-} elseif (Test-Path $configPath) {
-    Write-Host "  Config already exists, skipping." -ForegroundColor Green
-}
-
 # Download Bootstrapper DLL (handles auto-updates on launch)
 if ($bootstrapperAsset) {
     $bootstrapperPath = Join-Path $pluginPath "MTGAESBootstrapper.dll"
@@ -261,18 +241,6 @@ if ($iconsAsset) {
     Remove-Item $iconsZipPath -Force
     Write-Host "  Icons installed." -ForegroundColor Green
 }
-
-# Step 5: Register URL scheme
-Write-Host "Registering mtgaes:// URL scheme..." -ForegroundColor Yellow
-$mtgaExe = Join-Path $mtgaPath "MTGA.exe"
-$regPath = "HKCU:\Software\Classes\mtgaes"
-New-Item -Path $regPath -Force | Out-Null
-Set-ItemProperty -Path $regPath -Name "(Default)" -Value "URL:MTGA Enhancement Suite"
-New-ItemProperty -Path $regPath -Name "URL Protocol" -Value "" -Force | Out-Null
-$cmdPath = Join-Path $regPath "shell\open\command"
-New-Item -Path $cmdPath -Force | Out-Null
-Set-ItemProperty -Path $cmdPath -Name "(Default)" -Value "`"$mtgaExe`" `"%1`""
-Write-Host "  URL scheme registered." -ForegroundColor Green
 
 # Done
 Write-Host ""

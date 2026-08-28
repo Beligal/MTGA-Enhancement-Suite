@@ -1,4 +1,4 @@
-# Builds the bundled MSI installer (release/MTGAPlus-Installer.msi).
+﻿# Builds the bundled MSI installer (release/MTGAPlus-Installer.msi).
 #
 # Unlike the .NET EXE installer, the MSI bundles BepInEx + the plugin and
 # installs them declaratively (files + registry), so Windows Defender doesn't
@@ -12,7 +12,7 @@
 # Usage:
 #   tools\build_msi.ps1 0.18.0
 #
-# Run AFTER tools\build_release.ps1 (it consumes release\*.dll / config.json).
+# Run AFTER tools\build_release.ps1 (it consumes release\*.dll).
 
 param(
     [Parameter(Mandatory=$true)]
@@ -33,7 +33,7 @@ $bepinexTag = "v5.4.23.5"
 $bepinexVer = $bepinexTag.TrimStart('v')
 
 # --- sanity: plugin payload must already be built ---
-foreach ($f in @("MTGAEnhancementSuite.dll", "MTGAESBootstrapper.dll", "config.json")) {
+foreach ($f in @("MTGAEnhancementSuite.dll", "MTGAESBootstrapper.dll")) {
     if (-not (Test-Path (Join-Path $releaseDir $f))) {
         throw "release\$f not found. Run tools\build_release.ps1 $Version first."
     }
@@ -63,7 +63,6 @@ $pluginStage = Join-Path $stage "BepInEx\plugins\MTGAEnhancementSuite"
 New-Item -ItemType Directory -Path $pluginStage -Force | Out-Null
 Copy-Item (Join-Path $releaseDir "MTGAEnhancementSuite.dll") $pluginStage -Force
 Copy-Item (Join-Path $releaseDir "MTGAESBootstrapper.dll")  $pluginStage -Force
-Copy-Item (Join-Path $releaseDir "config.json")             $pluginStage -Force
 
 # 3. Icons -> plugin\icons (matches what install.ps1 lays down)
 $iconsSrc = Join-Path $repoRoot "assets\icons"

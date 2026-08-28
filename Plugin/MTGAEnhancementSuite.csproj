@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <!-- netstandard2.1, non net472: da Unity 6.3 le assembly di Arena sono
@@ -21,9 +21,9 @@
          spedito 1.0.0.0: partire da 0.19.0.0 sarebbe un numero piu' basso, e
          l'installatore rifiuterebbe l'aggiornamento per la stessa ragione. La
          versione pubblica della mod resta quella in PluginInfo.VERSION. -->
-    <Version>1.19.0</Version>
-    <FileVersion>1.19.0.0</FileVersion>
-    <AssemblyVersion>1.19.0.0</AssemblyVersion>
+    <Version>1.20.0</Version>
+    <FileVersion>1.20.0.0</FileVersion>
+    <AssemblyVersion>1.20.0.0</AssemblyVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
