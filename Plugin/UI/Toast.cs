@@ -66,10 +66,13 @@ namespace MTGAEnhancementSuite.UI
             StartCoroutine(ShowToastCoroutine(message, type, duration));
         }
 
-        public static void Info(string message) => Instance.Show(message, ToastType.Info);
-        public static void Success(string message) => Instance.Show(message, ToastType.Success);
-        public static void Warning(string message) => Instance.Show(message, ToastType.Warning);
-        public static void Error(string message) => Instance.Show(message, ToastType.Error);
+        // La durata e' opzionale: chi ha un messaggio piu' lungo di una riga, o
+        // che chiede all'utente di fare qualcosa, puo' allungarla senza
+        // rallentare tutti gli altri avvisi.
+        public static void Info(string message, float duration = DisplayDuration) => Instance.Show(message, ToastType.Info, duration);
+        public static void Success(string message, float duration = DisplayDuration) => Instance.Show(message, ToastType.Success, duration);
+        public static void Warning(string message, float duration = DisplayDuration) => Instance.Show(message, ToastType.Warning, duration);
+        public static void Error(string message, float duration = DisplayDuration) => Instance.Show(message, ToastType.Error, duration);
 
         private IEnumerator ShowToastCoroutine(string message, ToastType type, float duration)
         {
