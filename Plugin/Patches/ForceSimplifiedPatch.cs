@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Reflection;
 using GreClient.CardData;
 using HarmonyLib;
@@ -35,6 +35,13 @@ namespace MTGAEnhancementSuite.Patches
     ///
     /// Il toggle e' letto a ogni invocazione: spegnendolo si torna al
     /// comportamento originale senza riavviare.
+    ///
+    /// LIMITE NOTO (2026-09-02): le terre full art a volte restano senza bordo.
+    /// La semplificazione su quelle non attecchisce sempre. Non e' una
+    /// corruzione — la carta e' giusta, l'illustrazione c'e', manca solo la
+    /// cornice — e per ora e' accettato com'e'. Se un giorno da' fastidio, il
+    /// punto da guardare e' ClearRecord/GetArtSize dentro CardSimplifier, che
+    /// sono quelli che decidono la cornice a partire dalla dimensione dell'arte.
     /// </summary>
     internal static class ForceSimplifiedPatch
     {
@@ -169,6 +176,40 @@ namespace MTGAEnhancementSuite.Patches
                 var inst = model.Instance;
                 if (inst != null && inst.FaceDownState != null &&
                     (inst.FaceDownState.IsFaceDown || inst.FaceDownState.IsCopiedFaceDown)) return;
+
+                // GUARDIA 3 — mai semplificare un modello senza illustrazione.
+                //
+                // Nei dialoghi a scelta multipla ("Choose One": carte modali,
+                // planeswalker, terre a doppio uso) i riquadri non sono carte ma
+                // rappresentazioni di abilita'. Misurati in gioco il 2026-09-02,
+                // dentro un 'BrowserCardHolder_Default':
+                //
+                //     grpId=188913  artId=0  skin='DA'  abilita'=0  tipi=<vuoto>
+                //
+                // contro una carta vera nella stessa partita:
+                //
+                //     grpId=95716   artId=449709  skin='DA'  abilita'=3  tipi=Enchantment
+                //
+                // Il marcatore e' l'ILLUSTRAZIONE, non l'identificatore: il grpId
+                // c'e' ed e' alto, ma artId e' 0 e la lista dei tipi e' vuota.
+                //
+                // Perche' si rompono: Simplify azzera lo skin code ('DA' -> ''), che
+                // su questi oggetti e' cio' che li fa disegnare. Il risultato e' il
+                // segnaposto col triangolo.
+                //
+                // La regola e' anche quella giusta di principio: questa funzione
+                // promette di togliere lo stile *conservando l'illustrazione*. Se
+                // illustrazione non ce n'e', non c'e' niente da conservare e niente
+                // da semplificare. Nel peggiore dei casi qualche oggetto anomalo
+                // resta non semplificato — un inconveniente, non un danno.
+                //
+                // Le guardie 1 e 2 non lo intercettavano: controllano la faccia
+                // coperta, e questi non sono coperti.
+                //
+                // Terzo contesto in cui questa patch colpisce piu' largamente di
+                // quanto faccia Arena (vedi MISTAKES.md #10).
+                if (model.GrpId == 0) return;
+                if (model.Printing == null || model.Printing.ArtId == 0) return;
 
                 var db = GameReflection.PantryGet<CardDatabase>();
                 if (db == null) return;
