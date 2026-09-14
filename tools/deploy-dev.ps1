@@ -45,6 +45,34 @@ if (Test-Path $log) {
     Write-Host "  Log archiviato: logs\LogOutput-$stamp.log" -ForegroundColor DarkGray
 }
 
+# Anche Arena ruota il suo log: a ogni avvio Player.log diventa Player-prev.log
+# e quello di prima sparisce. Due riavvii e la prova di una sessione non c'e'
+# piu' (successo davvero l'11/09/2026). Lo archiviamo accanto all'altro, con lo
+# stesso criterio: il nome porta la data di ULTIMA SCRITTURA del file, non
+# quella di adesso, cosi' due deploy di fila non ne fanno due copie.
+$arenaLog = Join-Path $env:USERPROFILE 'AppData\LocalLow\Wizards Of The Coast\MTGA\Player.log'
+if (Test-Path $arenaLog) {
+    try {
+        $archive = Join-Path $MTGARoot 'BepInEx_Dev\logs'
+        if (-not (Test-Path $archive)) { New-Item -ItemType Directory -Path $archive | Out-Null }
+        $item = Get-Item $arenaLog
+        $stamp = $item.LastWriteTime.ToString('yyyyMMdd-HHmmss')
+        $arenaDest = Join-Path $archive "Player-$stamp.log"
+        if (Test-Path $arenaDest) {
+            Write-Host "  Player.log gia' archiviato: logs\Player-$stamp.log" -ForegroundColor DarkGray
+        } else {
+            Copy-Item $arenaLog $arenaDest
+            $mb = [math]::Round($item.Length / 1MB, 1)
+            Write-Host "  Player.log archiviato: logs\Player-$stamp.log ($mb MB)" -ForegroundColor DarkGray
+        }
+    } catch {
+        # Un log non archiviabile non deve far fallire il deploy: si segnala e si tira dritto.
+        Write-Host "  Player.log non archiviato: $($_.Exception.Message)" -ForegroundColor DarkYellow
+    }
+} else {
+    Write-Host "  Player.log non trovato in AppData\LocalLow - niente da archiviare" -ForegroundColor DarkGray
+}
+
 # Icone: assets/icons e' la sorgente di verita', allineiamo la cartella dev.
 $iconSrc = Join-Path $repo 'assets\icons'
 if (Test-Path $iconSrc) {

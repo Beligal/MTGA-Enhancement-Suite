@@ -89,6 +89,7 @@ namespace MTGAEnhancementSuite.Patches
         /// </summary>
         static void EtbPostfix(ref object __result)
         {
+            using var _fc = Diagnostics.FrameCost.Measure("CardVFX.Etb");
             try
             {
                 if (!ModSettings.Instance.DisableCardVFX) return;
@@ -150,6 +151,7 @@ namespace MTGAEnhancementSuite.Patches
         /// </summary>
         static bool TriggerPrefix()
         {
+            using var _fc = Diagnostics.FrameCost.Measure("CardVFX.Trigger");
             try
             {
                 if (ModSettings.Instance.DisableCardVFX)
@@ -170,6 +172,7 @@ namespace MTGAEnhancementSuite.Patches
         /// </summary>
         static void SplinePathPostfix(object __instance, ref string __result)
         {
+            using var _fc = Diagnostics.FrameCost.Measure("CardVFX.SplinePath");
             try
             {
                 if (!ModSettings.Instance.DisableCardVFX) return;

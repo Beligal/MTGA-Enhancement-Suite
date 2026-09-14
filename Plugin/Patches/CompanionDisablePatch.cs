@@ -76,6 +76,7 @@ namespace MTGAEnhancementSuite.Patches
         /// </summary>
         static bool ZoneCountVisibilityPrefix(ref bool visible)
         {
+            using var _fc = Diagnostics.FrameCost.Measure("Companions.ZoneVisibility");
             try
             {
                 if (ModSettings.Instance.DisableCompanions)
@@ -89,6 +90,7 @@ namespace MTGAEnhancementSuite.Patches
 
         static void Postfix(ref object __result)
         {
+            using var _fc = Diagnostics.FrameCost.Measure("Companions.Create");
             try
             {
                 if (!ModSettings.Instance.DisableCompanions) return;
