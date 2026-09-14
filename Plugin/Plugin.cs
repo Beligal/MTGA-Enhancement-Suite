@@ -54,6 +54,9 @@ namespace MTGAEnhancementSuite
                 Patches.CompanionDisablePatch.Apply(_harmony);
                 Patches.CardVFXPatch.Apply(_harmony);
                 Patches.ForceSimplifiedPatch.Apply(_harmony);
+                Patches.HideDeckCardsPatch.Apply(_harmony);
+                Patches.SparkyDeckPatch.Apply(_harmony);
+                Patches.SparkyBehaviourPatch.Apply(_harmony);
                 Log.LogInfo("Manual Harmony patches applied");
             }
             catch (Exception ex)
@@ -143,12 +146,21 @@ namespace MTGAEnhancementSuite
             {
                 if (KeyPressed(Key.F7))
                     Features.AnimationFastForward.Toggle();
+                if (KeyPressed(Key.F8))
+                    Features.CombatTotals.Toggle();
+                if (KeyPressed(Key.F9))
+                    UI.SparkyMenu.Toggle();
             });
 
             RunFeature("AnimationFastForward", Features.AnimationFastForward.Tick);
 
             // Pulsante preset a destra della barra filtri del deck editor.
             RunFeature("DeckPresetButton", Features.DeckPresetButton.Tick);
+
+            // Totali di attacco/difesa durante il combattimento. Gira a ogni
+            // frame ma esce subito fuori dal duello: la ricerca di GameManager
+            // e' limitata a una al secondo, vedi CombatTotals.CurrentState.
+            RunFeature("CombatTotals", Features.CombatTotals.Tick);
         }
 
         // Arena gira con l'active input handling impostato su Input System
@@ -296,6 +308,7 @@ namespace MTGAEnhancementSuite
             // forward, restore Time.timeScale so the game (or whatever
             // host process is left) doesn't continue at 100x.
             Features.AnimationFastForward.ForceRestore();
+            Features.CombatTotals.ForceHide();
         }
     }
 

@@ -126,7 +126,7 @@ namespace MTGAEnhancementSuite.UI
             CreateToggle(_settingsContent.transform, "CompanionToggle",
                 "Disable Companions",
                 "Hides all pets/companions during matches — no rendering, animations, or sounds.",
-                new Vector2(0.05f, 0.745f), new Vector2(0.95f, 0.850f),
+                new Vector2(0.05f, 0.755f), new Vector2(0.95f, 0.850f),
                 ModSettings.Instance.DisableCompanions,
                 (val) =>
                 {
@@ -139,7 +139,7 @@ namespace MTGAEnhancementSuite.UI
             CreateToggle(_settingsContent.transform, "CardVFXToggle",
                 "Disable Card Animations",
                 "Removes flashy ETB effects, 3D model popups, and cosmetic card animations. Basic arrival sounds are kept.",
-                new Vector2(0.05f, 0.615f), new Vector2(0.95f, 0.720f),
+                new Vector2(0.05f, 0.646f), new Vector2(0.95f, 0.741f),
                 ModSettings.Instance.DisableCardVFX,
                 (val) =>
                 {
@@ -152,7 +152,7 @@ namespace MTGAEnhancementSuite.UI
             CreateToggle(_settingsContent.transform, "ForceSimplifiedToggle",
                 "Force Simplified Cards",
                 "Always show cards without special styling (showcase, borderless, alt-art). Artwork is kept. Applies in matches and in the examine view.",
-                new Vector2(0.05f, 0.485f), new Vector2(0.95f, 0.590f),
+                new Vector2(0.05f, 0.537f), new Vector2(0.95f, 0.632f),
                 ModSettings.Instance.ForceSimplifiedCards,
                 (val) =>
                 {
@@ -161,6 +161,43 @@ namespace MTGAEnhancementSuite.UI
                     Toast.Info(val ? "Simplified cards on" : "Simplified cards off");
                 });
 
+            // Hide cards already maxed out in the open deck. The rule is
+            // MTGA's own "can I still add this card?" check, so it follows the
+            // format limit (4, or 1 in Brawl) and keeps basic lands and
+            // any-number cards visible. See Patches/HideDeckCardsPatch.cs.
+            CreateToggle(_settingsContent.transform, "HideDeckCardsToggle",
+                "Hide Cards Already In Deck",
+                "In the deck editor, hides cards the open deck already has the maximum of (4, or 1 in Brawl). Basic lands and any-number cards stay. Constructed only.",
+                new Vector2(0.05f, 0.428f), new Vector2(0.95f, 0.523f),
+                ModSettings.Instance.HideCardsInDeck,
+                (val) =>
+                {
+                    ModSettings.Instance.HideCardsInDeck = val;
+                    ModSettings.Instance.Save();
+                    // Se il deck editor e' aperto dietro al pannello, la lista
+                    // si ridisegna subito invece che al primo filtro toccato.
+                    Patches.HideDeckCardsPatch.RefreshPoolNow();
+                    Toast.Info(val ? "Cards in deck hidden" : "Cards in deck shown");
+                });
+
+            // Cartellino coi totali di combattimento. Vedi
+            // Features/CombatTotals.cs. Il tasto F8 fa la stessa cosa in
+            // partita, ma da qui si vede che la funzione esiste.
+            CreateToggle(_settingsContent.transform, "CombatTotalsToggle",
+                "Combat Damage Counter",
+                "During combat, shows the total power/toughness of the attackers and of the creatures that can still block, plus how much damage is stopped and how much gets through. Also on F8.",
+                new Vector2(0.05f, 0.319f), new Vector2(0.95f, 0.414f),
+                ModSettings.Instance.CombatTotals,
+                (val) =>
+                {
+                    ModSettings.Instance.CombatTotals = val;
+                    ModSettings.Instance.Save();
+                    // Se si spegne mentre una partita e' aperta dietro al
+                    // pannello, il cartellino deve sparire subito e non al
+                    // prossimo combattimento.
+                    if (!val) Features.CombatTotals.HideNow();
+                    Toast.Info(val ? "Combat counter on" : "Combat counter off");
+                });
 
             // Export collection — opens a Windows save dialog and writes the
             // owned cards in MTGA deck-list format. Useful for backing up
@@ -168,7 +205,7 @@ namespace MTGAEnhancementSuite.UI
             CreateActionRow(_settingsContent.transform, "ExportCollectionRow",
                 "Export Collection",
                 "Save your owned cards to a text file (MTGA deck format) — for sharing with deckbuilders or backing up your collection.",
-                new Vector2(0.05f, 0.355f), new Vector2(0.95f, 0.460f),
+                new Vector2(0.05f, 0.210f), new Vector2(0.95f, 0.305f),
                 "Export…",
                 () =>
                 {
@@ -254,7 +291,13 @@ namespace MTGAEnhancementSuite.UI
             descTmp.text = description;
             descTmp.fontSize = 13;
             descTmp.color = new Color(0.6f, 0.6f, 0.7f);
-            descTmp.alignment = TextAlignmentOptions.Left;
+            // Dall'alto e a capo automatico: senza, una descrizione lunga
+            // esce dal riquadro e finisce fuori dalla finestra (visto il
+            // 2026-09-11 con la riga del contatore di combattimento). Il
+            // ritorno a capo non e' attivo d'ufficio: dipende dalle
+            // TMP_Settings del gioco, quindi va chiesto esplicitamente.
+            descTmp.textWrappingMode = TextWrappingModes.Normal;
+            descTmp.alignment = TextAlignmentOptions.TopLeft;
 
             // Action button on the right
             var btnObj = CreateChild(row.transform, "ActionBtn");
@@ -312,7 +355,13 @@ namespace MTGAEnhancementSuite.UI
             descTmp.text = description;
             descTmp.fontSize = 13;
             descTmp.color = new Color(0.6f, 0.6f, 0.7f);
-            descTmp.alignment = TextAlignmentOptions.Left;
+            // Dall'alto e a capo automatico: senza, una descrizione lunga
+            // esce dal riquadro e finisce fuori dalla finestra (visto il
+            // 2026-09-11 con la riga del contatore di combattimento). Il
+            // ritorno a capo non e' attivo d'ufficio: dipende dalle
+            // TMP_Settings del gioco, quindi va chiesto esplicitamente.
+            descTmp.textWrappingMode = TextWrappingModes.Normal;
+            descTmp.alignment = TextAlignmentOptions.TopLeft;
 
             // Toggle button (checkbox-style)
             var toggleObj = CreateChild(row.transform, "ToggleBtn");

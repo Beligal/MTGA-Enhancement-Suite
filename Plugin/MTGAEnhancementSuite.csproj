@@ -70,6 +70,13 @@
       <HintPath>$(MTGAManaged)\Wizards.MDN.GreProtobuf.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <!-- I campi ripetuti dei messaggi GRE (per esempio
+         Attacker.LegalDamageRecipients) sono RepeatedField<T>, che vive qui:
+         senza questa reference non si puo' nemmeno scorrerli con foreach. -->
+    <Reference Include="Google.Protobuf">
+      <HintPath>$(MTGAManaged)\Google.Protobuf.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Core">
       <HintPath>$(MTGAManaged)\Core.dll</HintPath>
       <Private>false</Private>

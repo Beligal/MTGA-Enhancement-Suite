@@ -29,6 +29,25 @@ namespace MTGAEnhancementSuite.State
         [JsonProperty("forceSimplifiedCards")]
         public bool ForceSimplifiedCards { get; set; } = false;
 
+        /// <summary>
+        /// Nasconde dalla lista delle carte del deck editor quelle di cui il
+        /// mazzo aperto ha gia' il massimo consentito dal formato (4, oppure 1
+        /// in Brawl; le terre base e le carte "quante ne vuoi" non spariscono
+        /// mai). Vedi Patches/HideDeckCardsPatch.cs.
+        /// </summary>
+        [JsonProperty("hideCardsInDeck")]
+        public bool HideCardsInDeck { get; set; } = false;
+
+        /// <summary>
+        /// Cartellino coi totali di forza e costituzione durante il
+        /// combattimento: quanto sta attaccando, quanto puo' ancora bloccare
+        /// chi difende. Si accende e si spegne con F8 (non c'e' ancora una
+        /// riga nel pannello Impostazioni). Vedi Features/CombatTotals.cs.
+        /// </summary>
+        [JsonProperty("combatTotals")]
+        public bool CombatTotals { get; set; } = true;
+
+
 
         /// <summary>
         /// LEGACY: pre-v0.19 user-defined deck folders + root-order, stored as
