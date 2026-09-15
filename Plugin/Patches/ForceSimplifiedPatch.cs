@@ -43,8 +43,9 @@ namespace MTGAEnhancementSuite.Patches
     ///    metodo <c>ClearRecord_Postfix</c>.
     ///
     /// D) CARTE CHE NON SI SEMPLIFICANO — guardia 6, attiva su A e su B.
-    ///    Terre base e stampe senza cornice (<c>Card_Frameless</c>) restano
-    ///    come sono. Il perche' sta per esteso su <c>MotivoEsclusione</c>.
+    ///    Terre base, stampe senza cornice (<c>Card_Frameless</c>) e le quattro
+    ///    stampe a tutta carta restano come sono. Il perche' sta per esteso su
+    ///    <c>MotivoEsclusione</c>.
     ///
     /// LIMITE NOTO (2026-09-02, ancora aperto): le terre full art NON base a
     /// volte restano senza bordo. Non e' una corruzione — la carta e' giusta,
@@ -641,17 +642,22 @@ namespace MTGAEnhancementSuite.Patches
         ///    togliere lo stile *conservando l'illustrazione*. Se la cornice fa
         ///    parte dell'illustrazione, non c'e' una cornice da sostituire.
         ///
-        /// Non entrano qui <c>Card_Borderless</c> (1458 stampe) ne' i vari
-        /// <c>Card_FullArt*</c>: quelle carte una cornice ce l'hanno, e' solo
-        /// senza bordo o piu' grande. Sono il limite noto in testa al file, che
-        /// resta aperto. Allargare la guardia fin li' spegnerebbe la funzione
-        /// su mezzo parco carte per un difetto che non e' dimostrato sia lo
-        /// stesso.
+        /// 3) STAMPE A TUTTA CARTA. Quattro carte, elencate su
+        ///    <c>IsTuttaCarta</c>. Meccanismo diverso — <c>GetArtSize</c>, non
+        ///    il tag buttato — ma stessa conclusione.
+        ///
+        /// Non entra qui <c>Card_Borderless</c> (1458 stampe): quelle carte una
+        /// cornice ce l'hanno, e' solo senza bordo, e togliere il trattamento
+        /// borderless e' **esattamente** cio' per cui questa funzione esiste.
+        /// Sono il limite noto in testa al file, che resta aperto. Allargare la
+        /// guardia fin li' spegnerebbe la funzione su mezzo parco carte per un
+        /// difetto che non e' dimostrato sia lo stesso.
         /// </summary>
         private static string MotivoEsclusione(CardPrintingRecord record)
         {
             if (IsLand(record) && IsBasic(record)) return "terra base";
             if (IsFrameless(record)) return "stampa senza cornice";
+            if (IsTuttaCarta(record)) return "stampa a tutta carta";
             return null;
         }
 
@@ -667,6 +673,42 @@ namespace MTGAEnhancementSuite.Patches
             for (int i = 0; i < tags.Count; i++)
                 if (tags[i] == MetaDataTag.Card_Frameless ||
                     tags[i] == MetaDataTag.Card_FramelessPromo) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Le stampe a tutta carta. Nel database di Arena sono **quattro**, e
+        /// tutte e quattro insieme:
+        ///
+        ///   69781  Llanowar Elves        DAR   raw = "G, full art"
+        ///   70140  Ghalta, Primal Hunger RIX   raw = "G, full art"
+        ///   90253  Utter End             KTK   raw = "WB gold, full art"
+        ///   94146  Gigantosaurus         FDN   raw = ""
+        ///
+        /// Qui il meccanismo non e' quello del tag buttato ma <c>GetArtSize</c>,
+        /// che riporta l'arte a <c>Normal</c> per tutto cio' che non e' un
+        /// token: hanno tutte <c>ArtSize = Full</c>, quindi l'illustrazione
+        /// finisce in una finestra che non e' la sua. E' lo stesso meccanismo
+        /// che aveva colpito la Plains UNF <c>81179</c>, che pero' la guardia
+        /// prendeva gia' per un'altra ragione — era una terra base.
+        ///
+        /// Tre su quattro (tutte tranne Utter End) sono stampe **a se'**, senza
+        /// una stampa base a cui ricadere: come le terre base, e a differenza
+        /// dei masterpiece frameless, per loro una semplificazione corretta non
+        /// esiste proprio. [VERIFIED su <c>AltToBasePrintings</c>]
+        ///
+        /// Non provate a schermo: sono quattro carte rare e il difetto e'
+        /// dedotto dalla struttura, non visto. Il costo di sbagliare e' che
+        /// quattro carte restano non semplificate. [STRONG INFERENCE]
+        /// </summary>
+        private static bool IsTuttaCarta(CardPrintingRecord record)
+        {
+            var tags = record.Tags;
+            if (tags == null) return false;
+            for (int i = 0; i < tags.Count; i++)
+                if (tags[i] == MetaDataTag.Card_FullArtPromo ||
+                    tags[i] == MetaDataTag.Card_FullArtGigantic ||
+                    tags[i] == MetaDataTag.Card_DynamicFullArt) return true;
             return false;
         }
 
