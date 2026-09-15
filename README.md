@@ -145,7 +145,7 @@ backup. In the **MTGA+** panel, under Settings.
 Click the **MTGA+** button in the navigation bar to open the panel:
 - **Disable Companions** — Hides all pets/companions during matches. No rendering, animations, or sounds.
 - **Disable Card Animations** — Removes flashy ETB effects, 3D model popups, and cosmetic card animations. Basic arrival sounds and card draw trajectories are preserved.
-- **Force Simplified Cards** — Always draws cards without special treatments (showcase, borderless, alternate art). The artwork is kept. Applies both in matches and in the examine view.
+- **Force Simplified Cards** — Always draws cards without special treatments (showcase, borderless, alternate art). The artwork is kept. Applies both in matches and in the examine view. Two kinds of printing are left alone on purpose: **basic lands** (no rules text, so there is nothing to make readable) and **frameless printings**, whose artwork already contains its own frame — the Kamigawa Japanese lands are the usual example.
 
 Settings are saved automatically and persist across game restarts.
 

@@ -42,13 +42,24 @@ namespace MTGAEnhancementSuite.Patches
     ///    Ne ricostruiamo uno di sola tinta. Il ragionamento per esteso sta sul
     ///    metodo <c>ClearRecord_Postfix</c>.
     ///
-    /// LIMITE NOTO (2026-09-02, ancora aperto): le terre full art a volte
-    /// restano senza bordo. Non e' una corruzione — la carta e' giusta,
+    /// D) CARTE CHE NON SI SEMPLIFICANO — guardia 6, attiva su A e su B.
+    ///    Terre base e stampe senza cornice (<c>Card_Frameless</c>) restano
+    ///    come sono. Il perche' sta per esteso su <c>MotivoEsclusione</c>.
+    ///
+    /// LIMITE NOTO (2026-09-02, ancora aperto): le terre full art NON base a
+    /// volte restano senza bordo. Non e' una corruzione — la carta e' giusta,
     /// l'illustrazione c'e', manca solo la cornice. Cugino del bug delle terre
     /// grigie ma causa diversa: li' era <c>RawFrameDetail</c>, qui e'
     /// <c>GetArtSize</c>, che riporta l'arte a <c>Normal</c>. Non toccato:
     /// normalizzare la dimensione dell'arte e' esattamente cio' che la funzione
     /// deve fare, e la cornice mancante e' il prezzo.
+    ///
+    /// Su quell'attribuzione pero' va messo un asterisco (2026-09-15): quelle
+    /// terre portano il tag <c>Card_Borderless</c>, e <c>ClearRecord</c> lo
+    /// butta esattamente come buttava <c>Card_Frameless</c>. Puo' essere la
+    /// causa vera, o una seconda causa sovrapposta. Non verificato: per
+    /// deciderlo serve vedere in gioco una borderless con art size gia'
+    /// <c>Normal</c>. [HYPOTHESIS]
     /// </summary>
     internal static class ForceSimplifiedPatch
     {
@@ -56,6 +67,7 @@ namespace MTGAEnhancementSuite.Patches
         private static bool _warnedFaceMismatch;
         private static bool _warnedStaleOverride;
         private static bool _warnedLandFrame;
+        private static FieldInfo _examineSourceModelField;
 
         public static void Apply(Harmony harmony)
         {
@@ -163,6 +175,15 @@ namespace MTGAEnhancementSuite.Patches
                 }
                 else
                 {
+                    // Serve a sapere QUALE carta si sta esaminando: senza,
+                    // la guardia 6 nella finestra di esame non puo' decidere
+                    // e si torna al comportamento precedente (riscrivere
+                    // sempre Styled in Unstyled).
+                    _examineSourceModelField = AccessTools.Field(typeof(ExamineViewCardHolder), "_sourceModel");
+                    Plugin.Log.LogInfo(_examineSourceModelField != null
+                        ? "ForceSimplified: ExamineViewCardHolder._sourceModel trovato, guardia 6 attiva anche in esame."
+                        : "ForceSimplified: ExamineViewCardHolder._sourceModel NON trovato: in esame terre base e stampe senza cornice verranno semplificate lo stesso.");
+
                     harmony.Patch(target, prefix: new HarmonyMethod(
                         typeof(ForceSimplifiedPatch), nameof(SetExamineState_Prefix)));
                     Plugin.Log.LogInfo("ForceSimplified: patch B (finestra di esame) applicata.");
@@ -240,9 +261,22 @@ namespace MTGAEnhancementSuite.Patches
                 if (model.GrpId == 0) return;
                 if (model.Printing == null || model.Printing.ArtId == 0) return;
 
-                // Nessuna guardia sulle terre: si semplificano come le
-                // altre carte. Il grigio delle terre "gold" non nasceva qui ma
-                // nella ripulitura del record — vedi la patch A5.
+                // GUARDIA 6 — terre base e stampe senza cornice.
+                //
+                // Si guarda il record della stampa MOSTRATA, non quello che
+                // Simplify ricostruirebbe: su una carta con stile e' l'alt a
+                // portare il tag, e il record base non lo ha.
+                var stampa = model.Printing.Record;
+                var motivo = MotivoEsclusione(stampa);
+                if (motivo != null)
+                {
+                    DiagEsclusione(model.GrpId, motivo, HolderPath(__instance));
+                    return;
+                }
+
+                // Le terre NON base si semplificano come le altre carte: il
+                // grigio delle terre "gold" non nasceva qui ma nella
+                // ripulitura del record — vedi la patch A5.
 
                 var db = GameReflection.PantryGet<CardDatabase>();
                 if (db == null) return;
@@ -393,6 +427,15 @@ namespace MTGAEnhancementSuite.Patches
                 // CardPrintingRecord e' una struct: niente controlli contro null.
                 if (!IsLand(baseRecord)) return;
 
+                // Le terre base non arrivano piu' qui per causa nostra: la
+                // guardia 6 le esclude a monte. Se ci arrivano lo stesso e'
+                // perche' Arena ha deciso da se' di semplificarle, e li' non
+                // mettiamo bocca — tanto piu' che la forma che sappiamo
+                // ricostruire ("B basic land", 4 stampe nel database) non e'
+                // quella che il database usa per le basic ("B basic Swamp",
+                // 88 stampe). [VERIFIED su Raw_CardDatabase_*.mtga]
+                if (IsBasic(baseRecord)) return;
+
                 // I due campi vanno rimessi ENTRAMBI, perche' le terre si
                 // dividono in due famiglie e Arena ne azzera uno per ciascuna.
                 var record = __result;
@@ -452,6 +495,13 @@ namespace MTGAEnhancementSuite.Patches
         /// ricostruiamo invece nella forma piu' corta, che nel database esiste
         /// sempre: <c>"WU land"</c>, <c>"C land"</c> (incolore),
         /// <c>"Z land"</c> (tre o piu' colori), <c>"U basic land"</c>.
+        ///
+        /// Il ramo <c>basic</c> dal 2026-09-15 non e' piu' raggiungibile: A5
+        /// esce prima sulle terre base. Resta perche' questa funzione descrive
+        /// il vocabolario del database, non il perimetro del chiamante — ma se
+        /// tornasse in uso, sappi che <c>"U basic land"</c> nel database ha 4
+        /// stampe contro le 89 di <c>"U basic Island"</c>: la forma giusta per
+        /// una basic passa dal sottotipo, non dal colore.
         /// </summary>
         private static string LandFrameDetail(CardPrintingRecord record)
         {
@@ -558,6 +608,108 @@ namespace MTGAEnhancementSuite.Patches
         }
 
         /// <summary>
+        /// GUARDIA 6 — perche' questa stampa non va semplificata, o null se
+        /// invece va benissimo. La stringa e' il motivo, e finisce nel log.
+        ///
+        /// 1) TERRE BASE. Semplificare serve a rendere leggibile una carta
+        ///    coperta di decorazioni. Una terra base non ha testo di regole:
+        ///    non c'e' niente da rendere leggibile, e in cambio si rischia di
+        ///    rovinare l'unica cosa che ha, l'illustrazione. Il saldo e'
+        ///    negativo per definizione, e con esse non si applica piu' nemmeno
+        ///    la ricostruzione di cornice della patch A5 (che per le basic
+        ///    produceva una forma sbagliata: vedi li').
+        ///
+        /// 2) STAMPE SENZA CORNICE. E' la causa del difetto segnalato il
+        ///    2026-09-15 sulle terre giapponesi di Kamigawa. Il colpevole e'
+        ///    <c>CardSimplifier.CanRemoveTag</c>:
+        ///
+        ///    <code>
+        ///    text.StartsWith("Card_") || text.StartsWith("Style_")
+        ///    </code>
+        ///
+        ///    che fra i tag rimossi prende anche <c>Card_Frameless</c>. Ma
+        ///    quel tag non e' uno stile da togliere: dice che l'illustrazione
+        ///    e' a tutta carta e **si porta dentro la propria cornice**.
+        ///    Toltolo, Arena disegna la cornice normale sopra un'arte che gia'
+        ///    ne ha una — titolo coperto, riquadri fuori posto. Ed e' anche il
+        ///    motivo per cui il difetto si vedeva solo su ALCUNE terre base:
+        ///    delle 1131 nel database, 345 hanno il tag e 786 no.
+        ///    [VERIFIED — enum <c>MetaDataTag</c> in SharedClientCore.dll,
+        ///    colonna Tags in Raw_CardDatabase_*.mtga]
+        ///
+        ///    Stesso ragionamento della guardia 3: quella funzione promette di
+        ///    togliere lo stile *conservando l'illustrazione*. Se la cornice fa
+        ///    parte dell'illustrazione, non c'e' una cornice da sostituire.
+        ///
+        /// Non entrano qui <c>Card_Borderless</c> (1458 stampe) ne' i vari
+        /// <c>Card_FullArt*</c>: quelle carte una cornice ce l'hanno, e' solo
+        /// senza bordo o piu' grande. Sono il limite noto in testa al file, che
+        /// resta aperto. Allargare la guardia fin li' spegnerebbe la funzione
+        /// su mezzo parco carte per un difetto che non e' dimostrato sia lo
+        /// stesso.
+        /// </summary>
+        private static string MotivoEsclusione(CardPrintingRecord record)
+        {
+            if (IsLand(record) && IsBasic(record)) return "terra base";
+            if (IsFrameless(record)) return "stampa senza cornice";
+            return null;
+        }
+
+        /// <summary>
+        /// La stampa e' una di quelle la cui illustrazione contiene gia' la
+        /// cornice. I due tag sono l'uno la variante promo dell'altro e nel
+        /// database compaiono spesso insieme sulla stessa carta.
+        /// </summary>
+        private static bool IsFrameless(CardPrintingRecord record)
+        {
+            var tags = record.Tags;
+            if (tags == null) return false;
+            for (int i = 0; i < tags.Count; i++)
+                if (tags[i] == MetaDataTag.Card_Frameless ||
+                    tags[i] == MetaDataTag.Card_FramelessPromo) return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Le carte gia' escluse dalla guardia 6, per non ripetere la stessa
+        /// riga a ogni disegno.
+        /// </summary>
+        private static readonly System.Collections.Generic.HashSet<uint> _esclusioniDiagSeen =
+            new System.Collections.Generic.HashSet<uint>();
+
+        /// <summary>
+        /// Una riga di log la prima volta che si incontra una carta esclusa.
+        /// Dice cosa ha guardato e perche' ha detto di no: senza, "non semplifica"
+        /// e "non ci e' mai passata" sarebbero indistinguibili nel log.
+        /// </summary>
+        private static void DiagEsclusione(uint grpId, string motivo, string dove)
+        {
+            if (_esclusioniDiagSeen.Count > 24 || !_esclusioniDiagSeen.Add(grpId)) return;
+            Plugin.Log.LogInfo(
+                $"ForceSimplified/guardia6: {motivo}, non semplificata. " +
+                $"grpId={grpId} dove='{dove}'");
+        }
+
+        /// <summary>
+        /// La carta che la finestra di esame sta mostrando, o null se non si
+        /// riesce a saperlo.
+        ///
+        /// <c>_sourceModel</c> e' assegnato da <c>ExamineCard(model, holder)</c>
+        /// **prima** della chiamata a <c>SetExamineState</c>, e riassegnato solo
+        /// da <c>Clear()</c>: quando il nostro prefix gira, il campo contiene
+        /// gia' la carta giusta — anche quando l'utente preme il pulsante, che
+        /// chiama <c>SetExamineState</c> senza ripassare da <c>ExamineCard</c>.
+        /// [VERIFIED su Core.dll]
+        /// </summary>
+        private static ICardDataAdapter ModelloEsaminato(ExamineViewCardHolder holder)
+        {
+            if (holder == null || _examineSourceModelField == null) return null;
+            var model = _examineSourceModelField.GetValue(holder) as ICardDataAdapter;
+            if (model == null || model.Printing == null) return null;
+            return model;
+        }
+
+        /// <summary>
         /// A2/A3) Azzera l override quando il CDC torna nel pool o cambia carta.
         /// Se i visual verranno aggiornati, CheckSimplifyOverride lo ricalcola
         /// subito dopo; altrimenti resta nullo e VisualModel ricade sul modello
@@ -612,14 +764,33 @@ namespace MTGAEnhancementSuite.Patches
         /// <summary>
         /// B) Prima dell applicazione: lo stato "stilizzato" diventa "senza
         /// stile". Tutti gli altri stati passano invariati.
+        ///
+        /// Vale anche qui la guardia 6: su una terra base o su una stampa senza
+        /// cornice si lascia <c>Styled</c>, altrimenti la finestra di esame
+        /// mostrerebbe la stessa carta rotta che la patch A non produce piu'.
+        /// Se il modello non si riesce a leggere si riscrive come prima: una
+        /// carta esaminata male e' un inconveniente, non un danno.
         /// </summary>
-        private static void SetExamineState_Prefix(ref ExamineState state)
+        private static void SetExamineState_Prefix(ExamineViewCardHolder __instance, ref ExamineState state)
         {
             using var _fc = Diagnostics.FrameCost.Measure("ForceSimplified.ExamineState");
             try
             {
                 if (!ModSettings.Instance.ForceSimplifiedCards) return;
-                if (state == ExamineState.Styled) state = ExamineState.Unstyled;
+                if (state != ExamineState.Styled) return;
+
+                var esaminata = ModelloEsaminato(__instance);
+                if (esaminata != null)
+                {
+                    var motivo = MotivoEsclusione(esaminata.Printing.Record);
+                    if (motivo != null)
+                    {
+                        DiagEsclusione(esaminata.GrpId, motivo, "finestra di esame");
+                        return;
+                    }
+                }
+
+                state = ExamineState.Unstyled;
             }
             catch (Exception ex)
             {
