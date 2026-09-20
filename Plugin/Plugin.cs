@@ -161,6 +161,11 @@ namespace MTGAEnhancementSuite
             // frame ma esce subito fuori dal duello: la ricerca di GameManager
             // e' limitata a una al secondo, vedi CombatTotals.CurrentState.
             RunFeature("CombatTotals", Features.CombatTotals.Tick);
+
+            // Registrazione degli esiti delle partite. Sonda il MatchManager
+            // ogni 0,25 s e si aggancia quando compare: fuori dal duello non
+            // esiste, perche' non e' nella tabella dei servizi del Pantry.
+            RunFeature("MatchRecorder", Features.MatchRecorder.Tick);
         }
 
         // Arena gira con l'active input handling impostato su Input System
@@ -354,6 +359,6 @@ namespace MTGAEnhancementSuite
     {
         public const string GUID = "com.mtgaenhancement.suite";
         public const string NAME = "MTGA Enhancement Suite";
-        public const string VERSION = "0.21.1";
+        public const string VERSION = "0.22.0";
     }
 }

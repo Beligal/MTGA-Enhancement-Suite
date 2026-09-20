@@ -108,151 +108,26 @@ namespace MTGAEnhancementSuite.Features
         {
             if (preset == null) return;
 
-            var provider = GameReflection.PantryGet<DeckBuilderModelProvider>();
-            if (provider == null || provider.Model == null || !provider.Model.HasLoadedDeck)
+            var entries = new List<DeckCardInserter.Entry>();
+            foreach (var card in preset.Cards)
+            {
+                if (card == null || card.Count == 0) continue;
+                entries.Add(new DeckCardInserter.Entry(card.GrpId, card.Count));
+            }
+
+            // La sequenza vera (i tre passi di refresh e lo spegnimento del
+            // suggerimento terre) vive in DeckCardInserter: la condividiamo con
+            // "aggiungi da un altro mazzo", che ha bisogno della stessa identica
+            // cosa. I commenti che spiegano il perche' di ogni passo sono li'.
+            var outcome = DeckCardInserter.Insert(entries, "Preset");
+            if (!outcome.DeckReady)
             {
                 Toast.Warning("Presets: no deck open");
                 return;
             }
 
-            var model = provider.Model;
-            uint added = 0, rejected = 0;
-
-            // Lo spegnimento del suggerimento terre non merita un avviso suo:
-            // un'azione dell'utente, un messaggio. Lo segnamo qui e lo
-            // aggiungiamo in coda all'avviso di esito, in fondo al metodo.
-            bool autoLandsTurnedOff = false;
-
-            foreach (var card in preset.Cards)
-            {
-                if (card == null || card.Count == 0) continue;
-                for (uint i = 0; i < card.Count; i++)
-                {
-                    bool ok;
-                    try { ok = model.CanAddCardToMainDeck(card.GrpId); }
-                    catch (Exception ex)
-                    {
-                        Plugin.Log.LogWarning($"Preset: CanAddCardToMainDeck({card.GrpId}) ha sollevato: {ex.Message}");
-                        ok = false;
-                    }
-
-                    if (!ok) { rejected++; continue; }
-
-                    try { model.AddCardToMainDeck(card.GrpId); added++; }
-                    catch (Exception ex)
-                    {
-                        rejected++;
-                        Plugin.Log.LogWarning($"Preset: AddCardToMainDeck({card.GrpId}) fallita: {ex.Message}");
-                    }
-                }
-            }
-
-            // Refresh in DUE passi, entrambi necessari:
-            //
-            //  1. Model.UpdateMainDeck() -> _mainDeck.ApplyFilters()
-            //     AddCardToMainDeck aggiunge solo alla pila grezza; la lista
-            //     filtrata che la UI legge resta ferma finche' non si
-            //     riapplicano i filtri. Senza questo le carte entrano nel
-            //     mazzo ma non si vedono fino al cambio di modalita'.
-            //
-            //  2. VisualsUpdater.UpdateAllDeckVisuals() -> ridisegna le viste.
-            //
-            // BasicLandSuggester fa esattamente cosi' (UpdateMainDeck alla fine
-            // del suo ciclo), poi AutoLandsToggle aggiunge il passo 2.
-            try
-            {
-                model.UpdatePile(DeckBuilderPile.MainDeck);
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log.LogWarning($"Preset: UpdatePile(MainDeck) fallita: {ex.Message}");
-                try { model.UpdateMainDeck(); } catch { }
-            }
-
-            // Se il preset ha portato delle terre base, spegniamo il
-            // suggerimento automatico delle terre.
-            //
-            // Perche' serve: Arena lo fa gia' da sola quando l'utente cambia a
-            // mano la quantita' di una terra base
-            // (DeckBuilderCardFilterProvider.OnTitleInPileChangedQuantity:
-            // "PrintingIsBasicLandOrWaste -> IsAutoSuggestLandsToggleOn = false").
-            // Il ragionamento e' che chi ha messo le terre di suo pugno sa cosa
-            // vuole. Ma quell'evento scatta sui cambi passati dalla UI, e
-            // AddCardToMainDeck scrive dritto nella pila grezza
-            // (_mainDeck.AddByGrpId): Arena non si accorge di niente, il
-            // suggerimento resta acceso e alla prima occasione ricalcola le
-            // basi. Bastava aggiungere una carta qualunque, o il comandante —
-            // UpdatePile(Commander) chiama SuggestLand() proprio cosi'.
-            //
-            // DEVE STARE QUI, DOPO UpdatePile. Prima non funziona: la lista che
-            // GetFilteredMainDeck() restituisce e' quella filtrata, e resta
-            // ferma a com'era finche' UpdatePile non riapplica i filtri (vedi il
-            // commento qui sopra). Messo prima, si legge il mazzo com'era
-            // *prima* del preset — su un mazzo nuovo, vuoto — e non si trova mai
-            // niente. Sbagliato una volta, il 2026-08-29, senza che nulla lo
-            // segnalasse: nessun errore, nessun warning, solo l'avviso che non
-            // compariva.
-            //
-            // Vale solo se il preset contiene davvero terre base: uno di sole
-            // magie lascia il suggerimento com'era.
-            try
-            {
-                var presetGrpIds = new HashSet<uint>();
-                foreach (var c in preset.Cards)
-                    if (c != null) presetGrpIds.Add(c.GrpId);
-
-                bool broughtBasicLands = false;
-                var mainDeck = model.GetFilteredMainDeck();
-                if (mainDeck != null)
-                {
-                    foreach (var cq in mainDeck)
-                    {
-                        if (cq?.Printing == null) continue;
-                        if (!presetGrpIds.Contains(cq.Printing.GrpId)) continue;
-                        if (!cq.Printing.IsBasicLand) continue;
-                        broughtBasicLands = true;
-                        break;
-                    }
-                }
-
-                Plugin.Log.LogInfo($"Preset: {mainDeck?.Count ?? 0} voci nel mazzo dopo il refresh, terre base dal preset: {broughtBasicLands}");
-
-                if (broughtBasicLands)
-                {
-                    var filters = GameReflection.PantryGet<DeckBuilderCardFilterProvider>();
-                    if (filters == null)
-                    {
-                        Plugin.Log.LogWarning("Preset: DeckBuilderCardFilterProvider non disponibile, suggerimento terre non spento.");
-                    }
-                    else if (!filters.IsAutoSuggestLandsToggleOn)
-                    {
-                        Plugin.Log.LogInfo("Preset: suggerimento terre gia' spento, niente da fare.");
-                    }
-                    else
-                    {
-                        filters.IsAutoSuggestLandsToggleOn = false;
-                        autoLandsTurnedOff = true;
-                        Plugin.Log.LogInfo("Preset: conteneva terre base, suggerimento automatico delle terre spento per questa sessione.");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Non blocchiamo l'applicazione del preset per questo: al
-                // massimo Arena ridistribuisce le terre come faceva prima.
-                Plugin.Log.LogWarning($"Preset: non ho potuto spegnere il suggerimento terre ({ex.Message})");
-            }
-
-            try
-            {
-                var visuals = GameReflection.PantryGet<DeckBuilderVisualsUpdater>();
-                if (visuals != null) visuals.UpdateAllDeckVisuals();
-                else Plugin.Log.LogWarning("Preset: DeckBuilderVisualsUpdater non disponibile, la UI potrebbe non aggiornarsi.");
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log.LogWarning($"Preset: UpdateAllDeckVisuals fallita: {ex.Message}");
-            }
+            uint added = outcome.Added, rejected = outcome.Rejected;
+            bool autoLandsTurnedOff = outcome.AutoLandsTurnedOff;
 
             Plugin.Log.LogInfo($"Preset '{preset.Name}' applicato: {added} aggiunte, {rejected} rifiutate.");
             PerPlayerLog.Info($"Preset '{preset.Name}': +{added} cards, {rejected} rejected");

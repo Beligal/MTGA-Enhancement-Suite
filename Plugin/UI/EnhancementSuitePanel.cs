@@ -95,6 +95,29 @@ namespace MTGAEnhancementSuite.UI
             _settingsTabBtn.GetComponent<Image>().color = new Color(0.15f, 0.15f, 0.25f, 0.9f); // inactive
             _settingsTabBtn.GetComponent<Button>().onClick.AddListener(new UnityAction(() => SwitchTab(true)));
 
+            // "Replays..." - non e' una scheda, e i puntini lo dicono:
+            // apre una finestra sua e chiude questo pannello.
+            //
+            // Sta QUI e non fra le righe delle impostazioni per una ragione
+            // precisa: quelle righe hanno ancore scritte a mano, la scala e'
+            // gia' stata ricalcolata una volta per farci stare la sesta, e una
+            // settima stringerebbe tutte le descrizioni. Rifare quella scala
+            // senza poter guardare il pannello in gioco e' il modo di
+            // consegnare descrizioni tagliate.
+            var replaysBtn = CreateButton(content.transform, "ReplaysBtn", "Replays...",
+                new Vector2(0.665f, 0.93f), new Vector2(0.80f, 0.99f));
+            replaysBtn.GetComponent<Image>().color = new Color(0.30f, 0.50f, 0.70f, 0.9f);
+            replaysBtn.GetComponent<Button>().onClick.AddListener(new UnityAction(() =>
+            {
+                Close();
+                try { ReplayBrowserWindow.Show(); }
+                catch (Exception ex)
+                {
+                    PerPlayerLog.Error($"ReplayBrowserWindow.Show failed: {ex}");
+                    Toast.Error("Could not open the replay list - see the log");
+                }
+            }));
+
             // Close button
             var closeBtn = CreateButton(content.transform, "CloseBtn", "X",
                 new Vector2(0.92f, 0.93f), new Vector2(0.98f, 0.99f));

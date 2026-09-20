@@ -55,8 +55,16 @@ context/
 release/
 firebase/.firebase/
 CLAUDE.md
+PLAN-server-removal.md
 
 # MSI build artifacts
 MsiInstaller/stage/
 MsiInstaller/*.wixpdb
 MsiInstaller/obj/
+
+# Replay viewer (viewer/)
+# The BUILT page, Plugin/Resources/replay-viewer.html, is committed on purpose:
+# dotnet build must not require Node. Only the toolchain's leftovers are ignored.
+viewer/node_modules/
+viewer/dist/
+viewer/*.tsbuildinfo

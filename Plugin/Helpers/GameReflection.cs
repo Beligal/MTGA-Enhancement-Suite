@@ -70,7 +70,12 @@ namespace MTGAEnhancementSuite.Helpers
                     _pantryGetOpen = AccessTools.Method(_pantryType, "Get");
                     if (_pantryGetOpen == null) return null;
                 }
-                var generic = _pantryGetOpen.MakeGenericMethod(typeof(T));
+                // MakeGenericMethod alloca e costa: farlo a ogni chiamata
+                // andava bene quando PantryGet si usava a mano, non quando lo
+                // chiama un Tick. La classe generica annidata da' una cache
+                // per tipo senza nemmeno una lookup in dizionario.
+                var generic = PantryGetCache<T>.Closed
+                    ?? (PantryGetCache<T>.Closed = _pantryGetOpen.MakeGenericMethod(typeof(T)));
                 return generic.Invoke(null, null) as T;
             }
             catch (Exception ex)
@@ -78,6 +83,16 @@ namespace MTGAEnhancementSuite.Helpers
                 Plugin.Log.LogWarning($"PantryGet<{typeof(T).Name}> failed: {ex.Message}");
                 return null;
             }
+        }
+
+        /// <summary>
+        /// Una casella per tipo: il CLR ne crea una copia per ogni T, quindi
+        /// leggere <c>PantryGetCache&lt;T&gt;.Closed</c> e' un accesso a campo
+        /// statico e basta.
+        /// </summary>
+        private static class PantryGetCache<T> where T : class
+        {
+            public static MethodInfo Closed;
         }
 
         /// <summary>

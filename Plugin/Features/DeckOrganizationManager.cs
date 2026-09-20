@@ -34,12 +34,10 @@ namespace MTGAEnhancementSuite.Features
         // switching accounts doesn't disturb the other's setup.
         // -----------------------------------------------------------------
 
-        // Cached reflection chain for Pantry.Get<IAccountClient>().AccountInformation.PersonaID.
-        // The IAccountClient interface lives in an assembly we can't reference
-        // by type, so we resolve it by name once and cache the members.
-        private static MethodInfo _pantryGetAccountClient;
-        private static PropertyInfo _accountInfoProp;
-        private static FieldInfo _personaIdField;
+        // La catena di reflection per PersonaID vive in Helpers/AccountId.cs:
+        // la usano anche le statistiche delle partite, e due copie da tenere
+        // allineate sarebbero due punti da correggere il giorno che Arena
+        // rinomina qualcosa.
 
         // (personaId, org) snapshot so the hot read accessors (Folders /
         // FindFolderById / RootOrder) don't reflect on every call. Refreshed
@@ -103,29 +101,7 @@ namespace MTGAEnhancementSuite.Features
             return org;
         }
 
-        private static string ResolveCurrentPersonaId()
-        {
-            try
-            {
-                if (_pantryGetAccountClient == null)
-                {
-                    var pantryType = GameReflection.TypeByName("Pantry");
-                    var accountClientType = GameReflection.TypeByName("IAccountClient");
-                    if (pantryType == null || accountClientType == null) return null;
-                    _pantryGetAccountClient = pantryType.GetMethod("Get")
-                        ?.MakeGenericMethod(accountClientType);
-                    _accountInfoProp = AccessTools.Property(accountClientType, "AccountInformation");
-                }
-                var accountClient = _pantryGetAccountClient?.Invoke(null, null);
-                if (accountClient == null) return null;
-                var info = _accountInfoProp?.GetValue(accountClient);
-                if (info == null) return null;
-                if (_personaIdField == null)
-                    _personaIdField = AccessTools.Field(info.GetType(), "PersonaID");
-                return _personaIdField?.GetValue(info) as string;
-            }
-            catch { return null; }
-        }
+        private static string ResolveCurrentPersonaId() => Helpers.AccountId.Current();
 
         // ---- Read accessors ----
 

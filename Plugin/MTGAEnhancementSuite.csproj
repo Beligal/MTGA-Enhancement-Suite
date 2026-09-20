@@ -21,9 +21,9 @@
          spedito 1.0.0.0: partire da 0.19.0.0 sarebbe un numero piu' basso, e
          l'installatore rifiuterebbe l'aggiornamento per la stessa ragione. La
          versione pubblica della mod resta quella in PluginInfo.VERSION. -->
-    <Version>1.21.1</Version>
-    <FileVersion>1.21.1.0</FileVersion>
-    <AssemblyVersion>1.21.1.0</AssemblyVersion>
+    <Version>1.22.0</Version>
+    <FileVersion>1.22.0.0</FileVersion>
+    <AssemblyVersion>1.22.0.0</AssemblyVersion>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
   </PropertyGroup>
 
@@ -139,5 +139,26 @@
       <Private>false</Private>
     </Reference>
   </ItemGroup>
+
+  <!-- Il visualizzatore dei replay.
+
+       E' la pagina React che `viewer/` costruisce in un file solo
+       (vite-plugin-singlefile) e che `ReplayExporter` riempie coi dati di un
+       match. Va incorporata nell'assembly, non spedita accanto: un file
+       accanto si perde, si aggiorna a meta', e un utente che copia solo la DLL
+       si ritrova un pulsante che non fa niente.
+
+       **L'HTML costruito e' committato apposta**, cosi' `dotnet build` non
+       richiede Node. Chi tocca `viewer/` deve rifare `npm run build` e
+       committare il risultato; chi tocca solo il C# non deve avere Node. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\replay-viewer.html"
+                      LogicalName="MTGAEnhancementSuite.Resources.replay-viewer.html" />
+  </ItemGroup>
+
+  <Target Name="VerifyReplayViewer" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('Resources\replay-viewer.html')"
+           Text="Manca Plugin\Resources\replay-viewer.html. Costruiscilo: cd viewer; npm install; npm run build" />
+  </Target>
 
 </Project>

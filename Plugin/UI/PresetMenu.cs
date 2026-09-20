@@ -48,7 +48,8 @@ namespace MTGAEnhancementSuite.UI
 
             var presets = CardPresetManager.All;
             int shown = Mathf.Min(presets.Count, MaxRows);
-            float height = padding * 2 + rowHeight * (shown + 1);
+            // shown + 3: salvataggio, importazione e stile del nome.
+            float height = padding * 2 + rowHeight * (shown + 3);
 
             var root = new GameObject("MTGAES_PresetMenu");
             UnityEngine.Object.DontDestroyOnLoad(root);
@@ -103,6 +104,33 @@ namespace MTGAEnhancementSuite.UI
                 {
                     UnityEngine.Object.Destroy(root);
                     CardPresetManager.SaveCurrentDeck();
+                }) : null,
+                null);
+
+            // --- import from another deck ---
+            //
+            // Sta qui e non su un pulsante suo nella barra filtri: quel
+            // contenitore e' lo stesso dei filtri avanzati, e quando Arena lo
+            // nasconde si porta via anche i nostri controlli. Una riga in un
+            // menu che si apre gia' non aggiunge nessun aggancio nuovo.
+            MakeRow(menu.transform, ref y, rowHeight, padding, fontSize,
+                canSave ? ">   Add from another deck..." : ">   No deck open",
+                canSave ? AccentText : TextDisabled,
+                canSave ? (Action)(() =>
+                {
+                    UnityEngine.Object.Destroy(root);
+                    DeckImportModal.Show();
+                }) : null,
+                null);
+
+            // --- deck name style ---
+            MakeRow(menu.transform, ref y, rowHeight, padding, fontSize,
+                canSave ? "A   Style deck name..." : "A   No deck open",
+                canSave ? AccentText : TextDisabled,
+                canSave ? (Action)(() =>
+                {
+                    UnityEngine.Object.Destroy(root);
+                    Features.DeckNameController.OpenForOpenDeck();
                 }) : null,
                 null);
 

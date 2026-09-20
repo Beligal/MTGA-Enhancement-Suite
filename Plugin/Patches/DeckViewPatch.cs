@@ -67,6 +67,13 @@ namespace MTGAEnhancementSuite.Patches
                 var overlay = __instance.GetComponent<DeckTileSelectionOverlay>();
                 if (overlay == null) overlay = __instance.gameObject.AddComponent<DeckTileSelectionOverlay>();
                 overlay.Refresh();
+
+                // Tasto destro sulla tessera -> editor del nome. Bind aggiorna
+                // l'id del mazzo a ogni riciclo della tessera, ma si iscrive
+                // all'evento una volta sola: vedi DeckNameRightClick.
+                var rename = __instance.GetComponent<DeckNameRightClick>();
+                if (rename == null) rename = __instance.gameObject.AddComponent<DeckNameRightClick>();
+                rename.Bind(__instance);
             }
             catch (Exception ex)
             {

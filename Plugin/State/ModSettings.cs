@@ -47,6 +47,17 @@ namespace MTGAEnhancementSuite.State
         [JsonProperty("combatTotals")]
         public bool CombatTotals { get; set; } = true;
 
+        /// <summary>
+        /// Salvataggio del flusso grezzo delle partite, per un futuro
+        /// visualizzatore di replay. **Spento di default, di proposito:** la
+        /// registrazione occupa spazio su disco e il costo reale del formato
+        /// non e' ancora misurato (vedi Features/ReplayRecorder.cs). Le
+        /// statistiche dei mazzi NON dipendono da questo: quelle si registrano
+        /// sempre e pesano una riga di testo a partita.
+        /// </summary>
+        [JsonProperty("recordReplays")]
+        public bool RecordReplays { get; set; } = false;
+
 
 
         /// <summary>
