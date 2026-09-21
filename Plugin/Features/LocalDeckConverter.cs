@@ -112,15 +112,38 @@ namespace MTGAEnhancementSuite.Features
 
             // 4. Delete the cloud deck.
             object delPromise = SafeInvoke(() => _deleteDeck.Invoke(dm, new object[] { cloudDeckId }), "DeleteDeck");
-            bool deleted = false;
+            var outcome = PromiseOutcome.Unknown;
             if (delPromise != null)
-                yield return GameReflection.AwaitPromise(delPromise, (ok, _) => { deleted = ok; });
+                yield return GameReflection.AwaitPromiseStatus(delPromise, (o, _) => { outcome = o; });
 
-            if (!deleted)
+            if (outcome != PromiseOutcome.Succeeded)
             {
-                // Roll back the local file so we don't leave a duplicate.
-                LocalDeckStore.Delete(saved.Id);
-                Toast.Error("Couldn't remove the cloud deck — kept it, aborted");
+                // The local copy is NEVER removed here, whatever the reason.
+                //
+                // It used to be deleted on anything that wasn't a confirmed
+                // success, which is how both copies could disappear. The
+                // narrower version that replaced that still deleted on a
+                // "confirmed refusal WITH the deck still in the cloud" — but
+                // nothing in this code can establish either half. Failed only
+                // means the promise reported Successful == false, which covers
+                // a server refusal and a client-side error alike; and the
+                // corroborating look at the deck list answered "still there"
+                // when it could not read the list at all, so a broken check
+                // AUTHORISED the delete instead of preventing it.
+                //
+                // Rather than keep refining a test that can't be made sound,
+                // drop the destructive branch. A duplicate the user removes in
+                // two clicks beats a deck that exists nowhere.
+                DeckManagerControllerPatch.ReloadDecksLikeMTGADoes();
+                DeckViewSelectorPatch.RebuildLocalDecks();
+
+                ConfirmActionModal.ShowInfo(
+                    "Couldn't confirm the move",
+                    $"'{saved.Name}' has been saved to Local Decks, but the game didn't confirm that the " +
+                    "cloud copy was removed. The local copy has been kept on purpose.\n\n" +
+                    "Check your cloud decks: if it's still there, you have a duplicate and can delete " +
+                    "either one. If it's gone, the move worked and there's nothing to do.");
+                PerPlayerLog.Info($"MakeLocal: delete of {cloudDeckId} not confirmed ({outcome}), local copy KEPT");
                 yield break;
             }
 

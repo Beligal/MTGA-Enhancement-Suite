@@ -38,6 +38,14 @@ namespace MTGAEnhancementSuite
                 Log.LogWarning($"Could not set TLS 1.2: {ex.Message}");
             }
 
+            // Se l'avvio e' andato bene si conferma l'aggiornamento in fondo a
+            // questo metodo. Questi due blocchi intercettano i propri errori —
+            // di proposito, perche' una patch che non attacca non deve impedire
+            // al resto di funzionare — quindi senza tenerne traccia si
+            // arriverebbe in fondo identici sia che abbiano funzionato sia che
+            // non abbiano fatto nulla.
+            bool startupOk = true;
+
             try
             {
                 _harmony = new Harmony(PluginInfo.GUID);
@@ -46,6 +54,7 @@ namespace MTGAEnhancementSuite
             }
             catch (Exception ex)
             {
+                startupOk = false;
                 Log.LogError($"Failed to apply attribute-based Harmony patches: {ex}");
             }
 
@@ -61,6 +70,7 @@ namespace MTGAEnhancementSuite
             }
             catch (Exception ex)
             {
+                startupOk = false;
                 Log.LogError($"Failed to apply manual Harmony patches: {ex}");
             }
 
@@ -70,6 +80,25 @@ namespace MTGAEnhancementSuite
             persistentObj.AddComponent<PluginBehaviour>();
 
             Log.LogInfo("Persistent behaviour created");
+
+            // Adesso si': le patch hanno attaccato e il comportamento persistente
+            // esiste. Se l'avvio precedente aveva applicato un aggiornamento, e'
+            // qui che lo si conferma e i backup vengono rimossi.
+            //
+            // Non confermare significa che al prossimo avvio il bootstrapper
+            // rimette la versione di prima. Se quella nuova continua a fallire,
+            // l'aggiornamento verra' rimesso in coda e ritirato via a ogni
+            // avvio: e' rumoroso nel log, e resta preferibile a lasciare in
+            // esecuzione una versione che non attacca le sue patch.
+            if (startupOk)
+            {
+                AutoUpdater.ConfirmUpdateApplied();
+            }
+            else
+            {
+                Log.LogError("Startup incomplete — NOT confirming the update. "
+                             + "The previous version will be restored on the next launch.");
+            }
         }
 
         private void OnDestroy()
@@ -146,8 +175,6 @@ namespace MTGAEnhancementSuite
             {
                 if (KeyPressed(Key.F7))
                     Features.AnimationFastForward.Toggle();
-                if (KeyPressed(Key.F8))
-                    Features.CombatTotals.Toggle();
                 if (KeyPressed(Key.F9))
                     UI.SparkyMenu.Toggle();
             });
@@ -156,11 +183,6 @@ namespace MTGAEnhancementSuite
 
             // Pulsante preset a destra della barra filtri del deck editor.
             RunFeature("DeckPresetButton", Features.DeckPresetButton.Tick);
-
-            // Totali di attacco/difesa durante il combattimento. Gira a ogni
-            // frame ma esce subito fuori dal duello: la ricerca di GameManager
-            // e' limitata a una al secondo, vedi CombatTotals.CurrentState.
-            RunFeature("CombatTotals", Features.CombatTotals.Tick);
 
             // Registrazione degli esiti delle partite. Sonda il MatchManager
             // ogni 0,25 s e si aggancia quando compare: fuori dal duello non
@@ -313,7 +335,6 @@ namespace MTGAEnhancementSuite
             // forward, restore Time.timeScale so the game (or whatever
             // host process is left) doesn't continue at 100x.
             Features.AnimationFastForward.ForceRestore();
-            Features.CombatTotals.ForceHide();
         }
     }
 

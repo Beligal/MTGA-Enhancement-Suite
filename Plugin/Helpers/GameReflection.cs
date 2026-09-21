@@ -8,6 +8,19 @@ using UnityEngine;
 namespace MTGAEnhancementSuite.Helpers
 {
     /// <summary>
+    /// How a reflected Promise ended. <see cref="Unknown"/> is the one that
+    /// matters: it means we stopped waiting, not that the operation failed.
+    /// Callers that delete, roll back or clean up must treat it as "maybe it
+    /// happened", never as "it didn't".
+    /// </summary>
+    internal enum PromiseOutcome
+    {
+        Succeeded,
+        Failed,
+        Unknown,
+    }
+
+    /// <summary>
     /// Shared reflection helpers for two things the rest of the codebase keeps
     /// re-implementing inline:
     ///   - <see cref="PantryGet{T}"/>: resolve a service from MTGA's Pantry IoC
@@ -102,43 +115,97 @@ namespace MTGAEnhancementSuite.Helpers
         /// coroutine. Caps the wait at <paramref name="timeoutSeconds"/> so a
         /// stuck server call can't hang the UI forever.
         ///
-        /// Uses unscaled time so the F7 fast-forward (Time.timeScale) doesn't
-        /// distort the timeout.
+        /// Collapses <see cref="PromiseOutcome.Failed"/> and
+        /// <see cref="PromiseOutcome.Unknown"/> into a single <c>false</c>. That
+        /// is fine for a caller that only reports the result to the user, and
+        /// WRONG for one that deletes something on the strength of it — use
+        /// <see cref="AwaitPromiseStatus"/> there.
         /// </summary>
         public static IEnumerator AwaitPromise(object promise, Action<bool, object> onDone, float timeoutSeconds = 30f)
         {
-            if (promise == null) { onDone?.Invoke(false, null); yield break; }
+            return AwaitPromiseStatus(promise,
+                (outcome, res) => onDone?.Invoke(outcome == PromiseOutcome.Succeeded, res),
+                timeoutSeconds);
+        }
+
+        /// <summary>
+        /// Same poll as <see cref="AwaitPromise"/>, but tells the three cases
+        /// apart: the call succeeded, the call answered no, or we stopped
+        /// waiting and never found out.
+        ///
+        /// The distinction is not academic. Nothing here cancels the request, so
+        /// a timeout means the server may still carry the operation out — and
+        /// may already have done so, with only the answer lost. A caller that
+        /// reads "no confirmation" as "it didn't happen" and cleans up
+        /// accordingly can destroy the thing it was protecting.
+        ///
+        /// Uses unscaled time so the F7 fast-forward (Time.timeScale) doesn't
+        /// distort the timeout.
+        /// </summary>
+        public static IEnumerator AwaitPromiseStatus(object promise, Action<PromiseOutcome, object> onDone,
+                                                     float timeoutSeconds = 30f)
+        {
+            if (promise == null) { onDone?.Invoke(PromiseOutcome.Unknown, null); yield break; }
 
             var t = promise.GetType();
             var isDoneProp = AccessTools.Property(t, "IsDone");
             var successfulProp = AccessTools.Property(t, "Successful");
             var resultProp = AccessTools.Property(t, "Result");
 
+            // No IsDone means we can never observe completion: don't pretend we
+            // waited and don't read anything into whatever Successful says.
+            bool completed = false;
+            bool unreadable = isDoneProp == null;
+
             float elapsed = 0f;
             while (isDoneProp != null)
             {
-                bool done = false;
+                bool done;
                 try { done = (bool)isDoneProp.GetValue(promise); }
-                catch { done = true; } // if we can't read it, stop waiting
-                if (done) break;
-                if (elapsed >= timeoutSeconds) break;
+                catch (Exception ex)
+                {
+                    // Can't tell whether it finished. This used to be treated as
+                    // "finished", which then read a meaningless Successful.
+                    Plugin.Log.LogWarning($"AwaitPromise: reading IsDone failed: {ex.Message}");
+                    unreadable = true;
+                    break;
+                }
+                if (done) { completed = true; break; }
+                if (elapsed >= timeoutSeconds)
+                {
+                    Plugin.Log.LogWarning(
+                        $"AwaitPromise: gave up after {timeoutSeconds}s — the request is still in flight, outcome unknown");
+                    break;
+                }
                 yield return null;
                 elapsed += Time.unscaledDeltaTime;
             }
 
-            bool ok = false;
-            object res = null;
-            try
+            var outcome = PromiseOutcome.Unknown;
+            object result = null;
+            if (completed && !unreadable)
             {
-                ok = successfulProp != null && (bool)successfulProp.GetValue(promise);
-                if (ok && resultProp != null) res = resultProp.GetValue(promise);
+                try
+                {
+                    if (successfulProp == null)
+                    {
+                        // Completed, but we have no way to read the verdict.
+                        outcome = PromiseOutcome.Unknown;
+                    }
+                    else
+                    {
+                        var ok = (bool)successfulProp.GetValue(promise);
+                        outcome = ok ? PromiseOutcome.Succeeded : PromiseOutcome.Failed;
+                        if (ok && resultProp != null) result = resultProp.GetValue(promise);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.LogWarning($"AwaitPromise: reading result failed: {ex.Message}");
+                    outcome = PromiseOutcome.Unknown;
+                }
             }
-            catch (Exception ex)
-            {
-                Plugin.Log.LogWarning($"AwaitPromise: reading result failed: {ex.Message}");
-                ok = false;
-            }
-            onDone?.Invoke(ok, res);
+            onDone?.Invoke(outcome, result);
         }
     }
 }

@@ -251,7 +251,6 @@ Click the **MTGA+** button in the navigation bar to open the panel:
 - **Disable Companions** — Hides all pets/companions during matches. No rendering, animations, or sounds.
 - **Disable Card Animations** — Removes flashy ETB effects, 3D model popups, and cosmetic card animations. Basic arrival sounds and card draw trajectories are preserved.
 - **Hide Cards Already in Your Deck** — In the deck builder, drops from the card pool anything you can no longer add, so what is left is what you can still play. Uses Arena's own rule for the "+" button, so per-card exceptions (basic lands, Relentless Rats, the Nazgûl) keep working. Constructed only: never applied while browsing the collection, viewing a deck read-only, in draft and sealed, or while sideboarding in a match.
-- **Combat Totals** — A readout on the left during combat: power and toughness of the attackers and of the blockers you could still declare, how much damage gets stopped and how much comes through, trample and deathtouch included. Toggle it here or with **F8**. On by default.
 - **Force Simplified Cards** — Always draws cards without special treatments (showcase, borderless, alternate art). The artwork is kept. Applies both in matches and in the examine view. Three kinds of printing are left alone on purpose: **basic lands** (no rules text, so there is nothing to make readable), **frameless printings**, whose artwork already contains its own frame — the Kamigawa Japanese lands are the usual example — and the four **full-art** printings, whose artwork does not fit a normal frame.
 
 Settings are saved automatically and persist across game restarts.
@@ -281,7 +280,7 @@ match.
 3. In the **MTGA+** panel, **Replays…** lists every recorded match and opens any of them
 4. In the deck builder, the gold button to the right of the filter bar handles **card presets**, **Add from another deck** and **deck name styling**
 5. In the deck list, right-click a **folder header** for folder actions, right-click a **deck** for its statistics or to style its name, or select several decks for bulk move and delete
-6. Press **F7** in a match to fast-forward animations, **F8** to toggle the combat totals
+6. Press **F7** in a match to fast-forward animations
 7. Press **F9** before a Sparky game to pick its deck and how it plays
 
 ## Uninstalling

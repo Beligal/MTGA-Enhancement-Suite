@@ -249,7 +249,10 @@ namespace MTGAEnhancementSuite.Features
             _skippedBeforeSeatKnown = 0;
 
             ReadContext(mm, _current);
-            ReplayRecorder.BeginMatch(_current.MatchId);
+            // Il nome del mazzo lo sa gia': ReadContext() e' appena girato.
+            // Serve per dare al file un nome leggibile invece del solo
+            // identificativo del match.
+            ReplayRecorder.BeginMatch(_current.MatchId, _current.DeckName);
 
             Plugin.Log.LogInfo(
                 $"MatchRecorder: inizio match {_current.MatchId ?? "?"} " +
@@ -338,6 +341,15 @@ namespace MTGAEnhancementSuite.Features
             }
 
             rec.ReplayFile = ReplayRecorder.FinishMatch(rec.MatchId);
+
+            // Il file nasce all'INIZIO della partita, quando dell'avversario
+            // non si sa ancora niente: i suoi colori si imparano guardando le
+            // carte che gioca. Qui la partita e' finita e si sanno, quindi il
+            // file prende adesso il suo nome definitivo — prima di Append(),
+            // cosi' il registro memorizza il nome giusto la prima volta.
+            var renamed = ReplayFiles.RenameWithOpponent(
+                ReplayRecorder.Directory(), rec.ReplayFile, UI.OpponentColorLabel.Plain(rec));
+            if (!string.IsNullOrEmpty(renamed)) rec.ReplayFile = renamed;
 
             bool ok = MatchStatsStore.Append(rec);
 

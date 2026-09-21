@@ -20,7 +20,10 @@ namespace MTGAEnhancementSuite.UI
 
             var canvas = modal.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 200;
+            // Stessa ragione di ConfirmActionModal.ConfirmSortingOrder: una
+            // conferma che nasce dietro la finestra che l'ha aperta non
+            // conferma niente. 260 = sopra ogni finestra del mod.
+            canvas.sortingOrder = 260;
             var scaler = modal.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);

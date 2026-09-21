@@ -14,6 +14,24 @@ namespace MTGAEnhancementSuite.UI
     /// </summary>
     internal static class ConfirmActionModal
     {
+        /// <summary>
+        /// Sopra qualunque finestra del mod.
+        ///
+        /// **Il difetto che ha prodotto questa costante (2026-09-21):** la
+        /// conferma stava a 200 e la finestra dei replay, come ogni
+        /// <see cref="ListModal"/>, sta a 238. Chiedendo di cancellare qualcosa
+        /// da li', la domanda nasceva DIETRO la finestra che l'aveva aperta: per
+        /// vederla bisognava chiudere quella davanti, e una conferma che si
+        /// deve andare a cercare non sta confermando niente.
+        ///
+        /// La scala delle finestre del mod, dal basso: pannello MTGA+ 100,
+        /// suggerimenti 150, menu cartelle 220, menu preset e Sparky 225, menu
+        /// tessera 235, ListModal 238, importazione 240, editor dei nomi 245,
+        /// scelta colore 250. Una conferma deve stare sopra tutte, perche' puo'
+        /// essere aperta da qualunque di loro.
+        /// </summary>
+        private const int ConfirmSortingOrder = 260;
+
         /// <summary>Single-button informational modal (just an OK to dismiss).</summary>
         public static void ShowInfo(string title, string body)
         {
@@ -22,7 +40,7 @@ namespace MTGAEnhancementSuite.UI
 
             var canvas = modal.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 200;
+            canvas.sortingOrder = ConfirmSortingOrder;
             var scaler = modal.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
@@ -83,7 +101,7 @@ namespace MTGAEnhancementSuite.UI
 
             var canvas = modal.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 200;
+            canvas.sortingOrder = ConfirmSortingOrder;
             var scaler = modal.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);

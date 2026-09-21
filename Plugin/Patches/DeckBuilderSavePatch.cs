@@ -67,11 +67,27 @@ namespace MTGAEnhancementSuite.Patches
                     FolderId   = existing?.FolderId,
                     FolderName = existing?.FolderName,
                 };
-                LocalDeckStore.Update(id, newName, text, meta);
+                LocalDeck savedDeck;
+                string saveError;
+                if (!LocalDeckStore.TryUpdate(id, newName, text, meta, out savedDeck, out saveError))
+                {
+                    // The write failed: the file on disk is untouched and the
+                    // edits are still in the builder. Say so and keep the user
+                    // here, exactly like the export-failure case above.
+                    // Reporting success is what used to lose work — the old
+                    // Update() swallowed the error and handed back the OLD deck,
+                    // so this caller had no way to tell, marked the save good,
+                    // dropped the cached deck and let the builder navigate away.
+                    Toast.Error($"Couldn't save local deck: {saveError ?? "write failed"}");
+                    PerPlayerLog.Info($"DeckBuilderSavePatch: local deck save FAILED ({id}): {saveError}");
+                    __result = Empty();
+                    MarkSaved(__instance, success: false);
+                    return false;
+                }
 
-                // Tell the builder the save "succeeded" so it navigates away
-                // cleanly (Coroutine_SaveDeckAndExit checks _isDeckSaveSuccess),
-                // and clear the in-flight flag.
+                // The deck is on disk. Tell the builder the save succeeded so it
+                // navigates away cleanly (Coroutine_SaveDeckAndExit checks
+                // _isDeckSaveSuccess), and clear the in-flight flag.
                 MarkSaved(__instance, success: true);
                 try { WrapperDeckBuilder.ClearCachedDeck(); } catch { }
 
@@ -79,7 +95,7 @@ namespace MTGAEnhancementSuite.Patches
                 DeckViewSelectorPatch.RebuildLocalDecks();
 
                 Toast.Success("Saved to Local Decks");
-                PerPlayerLog.Info($"DeckBuilderSavePatch: local deck saved to disk ({id})");
+                PerPlayerLog.Info($"DeckBuilderSavePatch: local deck saved to disk ({id} '{savedDeck.Name}')");
 
                 __result = Empty();
                 return false; // skip the cloud CreateDeck/UpdateDeck path

@@ -40,7 +40,12 @@ namespace MTGAEnhancementSuite.UI
 
             var canvas = _canvasRoot.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = 200; // Above everything
+            // 200 NON e' sopra tutto — diverse finestre del mod stanno piu'
+            // in alto (ListModal 238, conferme 260). Va bene lo stesso
+            // perche' i messaggi compaiono nell'angolo in alto a sinistra,
+            // dove quelle finestre non arrivano: se un giorno si spostassero
+            // al centro, questo numero andrebbe rivisto.
+            canvas.sortingOrder = 200;
 
             var scaler = _canvasRoot.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

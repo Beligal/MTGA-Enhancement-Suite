@@ -233,13 +233,26 @@ namespace MTGAEnhancementSuite.Features
         /// GUID the editor was opened with even if the name changed, so the
         /// caller's notion of identity is stable for that session; the on-disk
         /// file is renamed to match the new name.
+        ///
+        /// Returns false — and leaves the file, the registry and the sidecar
+        /// meta exactly as they were — if anything fails. There is deliberately
+        /// no result-less overload: a caller that reports "saved" without
+        /// checking this makes the user throw away edits that never reached the
+        /// disk, and a caller that only checks for null couldn't tell either,
+        /// because a failed save used to hand back the OLD deck object.
+        ///
+        /// <paramref name="deck"/> is meaningful only when this returns true.
         /// </summary>
-        public static LocalDeck Update(Guid id, string newName, string exportText, LocalDeckMeta meta = null)
+        public static bool TryUpdate(Guid id, string newName, string exportText,
+                                     LocalDeckMeta meta, out LocalDeck deck, out string error)
         {
             EnsureLoaded();
+            deck = null;
+            error = null;
             var existing = Get(id);
             // Preserve the existing meta if the caller didn't supply one.
             if (meta == null) meta = existing?.Meta ?? new LocalDeckMeta();
+            string tmpPath = null;
             try
             {
                 var resolved = SanitizeName(newName);
@@ -252,7 +265,23 @@ namespace MTGAEnhancementSuite.Features
 
                 var newPath = Path.Combine(Directory, finalName + ".txt");
 
-                // Remove the old file if the name changed.
+                if (!System.IO.Directory.Exists(Directory))
+                    System.IO.Directory.CreateDirectory(Directory);
+
+                // Write to a temp file in the SAME folder, then publish it. The
+                // order matters and used to be the other way round: the old file
+                // was deleted BEFORE the new one existed, so a full disk or a
+                // refused create left the user with neither. Nothing already on
+                // disk is touched until the new contents are safely there.
+                // This guards the plain overwrite too, not just renames —
+                // WriteAllText truncates its target before writing a byte.
+                tmpPath = newPath + ".tmp";
+                File.WriteAllText(tmpPath, exportText ?? "");
+                PublishFile(tmpPath, newPath);
+                tmpPath = null;
+
+                // The new file is on disk. Only NOW retire the old one (renames
+                // only) and touch the in-memory registry.
                 if (existing != null && !string.Equals(existing.FilePath, newPath, StringComparison.OrdinalIgnoreCase))
                 {
                     try { if (File.Exists(existing.FilePath)) File.Delete(existing.FilePath); } catch { }
@@ -260,8 +289,7 @@ namespace MTGAEnhancementSuite.Features
                     _metaByKey.Remove(MetaKey(existing.Name));
                 }
 
-                File.WriteAllText(newPath, exportText ?? "");
-                var deck = new LocalDeck { Id = GuidForName(finalName), Name = finalName, FilePath = newPath, Meta = meta };
+                deck = new LocalDeck { Id = GuidForName(finalName), Name = finalName, FilePath = newPath, Meta = meta };
                 _byId[deck.Id] = deck;
                 // Also keep the original session GUID resolvable so an open editor
                 // (which holds the old id) still maps here until the next reload.
@@ -270,12 +298,18 @@ namespace MTGAEnhancementSuite.Features
                 SaveMeta();
                 _pendingIds.Remove(id); // first save of a new deck makes it real
                 Plugin.Log.LogInfo($"LocalDeckStore: updated local deck '{finalName}' (format={meta.Format ?? "?"})");
-                return deck;
+                return true;
             }
             catch (Exception ex)
             {
-                Plugin.Log.LogWarning($"LocalDeckStore.Update({id}): {ex.Message}");
-                return existing;
+                error = ex.Message;
+                Plugin.Log.LogWarning($"LocalDeckStore.TryUpdate({id}): {ex.Message}");
+                // Don't leave a half-written temp behind for the next save to
+                // trip over. Load() only globs *.txt so it was never visible as
+                // a deck, but there is no reason to keep it.
+                if (tmpPath != null) { try { if (File.Exists(tmpPath)) File.Delete(tmpPath); } catch { } }
+                deck = null;
+                return false;
             }
         }
 
@@ -314,6 +348,70 @@ namespace MTGAEnhancementSuite.Features
                 var bytes = md5.ComputeHash(Encoding.UTF8.GetBytes("mtgaes-local:" + name.ToLowerInvariant()));
                 return new Guid(bytes);
             }
+        }
+
+        // Moves a COMPLETED temp file onto its final path. When the destination
+        // already exists the swap goes through File.Replace, which keeps the
+        // previous contents in a .bak until it has gone through, so an
+        // interrupted save cannot leave the deck as a truncated file. The
+        // backup is dropped on success; Load() only globs *.txt, so neither the
+        // temp nor the backup can ever surface as a phantom deck.
+        private static void PublishFile(string tmpPath, string finalPath)
+        {
+            if (!File.Exists(finalPath))
+            {
+                File.Move(tmpPath, finalPath);
+                return;
+            }
+
+            var backupPath = finalPath + ".bak";
+            try { if (File.Exists(backupPath)) File.Delete(backupPath); } catch { }
+
+            try
+            {
+                File.Replace(tmpPath, finalPath, backupPath);
+                try { File.Delete(backupPath); } catch { }
+                return;
+            }
+            catch (Exception ex)
+            {
+                // Replace can fail for plenty of reasons, not just a file system
+                // that doesn't support it, so the fallback has to be safe in all
+                // of them. It used to be `File.Delete(finalPath)` followed by a
+                // Move: if that Move then failed, the caller's handler deleted
+                // the temp and the deck existed NOWHERE. Never delete the last
+                // copy to make room for one that isn't in place yet.
+                Plugin.Log.LogWarning(
+                    $"LocalDeckStore: File.Replace failed ({ex.Message}), falling back to rename-aside");
+            }
+
+            // Move the old file ASIDE — a rename, so its contents survive — and
+            // only then move the new one in. If that second move fails, the old
+            // one goes straight back. Every path through here keeps at least one
+            // readable copy of the deck on disk.
+            File.Move(finalPath, backupPath);
+            try
+            {
+                File.Move(tmpPath, finalPath);
+            }
+            catch
+            {
+                try
+                {
+                    File.Move(backupPath, finalPath);
+                }
+                catch (Exception restoreEx)
+                {
+                    // Even here the deck is not lost: its contents are in the
+                    // .bak, which Load() ignores but the user can rename back.
+                    // Say exactly where it is rather than failing silently.
+                    Plugin.Log.LogError(
+                        $"LocalDeckStore: could not put '{Path.GetFileName(finalPath)}' back after a failed save "
+                        + $"({restoreEx.Message}). Its previous contents are in '{Path.GetFileName(backupPath)}'.");
+                }
+                throw;
+            }
+            try { File.Delete(backupPath); } catch { }
         }
 
         private static string SanitizeName(string name)

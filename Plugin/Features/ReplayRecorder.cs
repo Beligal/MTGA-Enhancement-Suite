@@ -27,8 +27,9 @@ namespace MTGAEnhancementSuite.Features
     /// </summary>
     internal static class ReplayRecorder
     {
-        private const string Extension = ".mtgarep.gz";
-
+        // L'estensione sta in ReplayFiles, insieme alle guardie che la usano
+        // per decidere cosa e' lecito cancellare: una seconda copia qui e' la
+        // deriva che prima o poi fa divergere le due.
         private static FileStream _file;
         private static GZipStream _gzip;
         private static string _path;
@@ -62,7 +63,7 @@ namespace MTGAEnhancementSuite.Features
 
         // -----------------------------------------------------------------
 
-        public static void BeginMatch(string matchId)
+        public static void BeginMatch(string matchId, string deckName)
         {
             Abort();   // una partita precedente lasciata aperta da un'uscita brusca
 
@@ -73,7 +74,7 @@ namespace MTGAEnhancementSuite.Features
 
             try
             {
-                string name = SafeName(matchId) + Extension;
+                string name = ReplayFiles.BuildName(DateTime.Now, deckName, matchId);
                 _path = Path.Combine(dir, name);
                 _file = new FileStream(_path, FileMode.Create, FileAccess.Write, FileShare.Read);
                 _gzip = new GZipStream(_file, CompressionMode.Compress);
@@ -206,22 +207,6 @@ namespace MTGAEnhancementSuite.Features
             _path = null;
             _messages = 0;
             _rawBytes = 0;
-        }
-
-        private static string SafeName(string matchId)
-        {
-            string stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
-            if (string.IsNullOrEmpty(matchId)) return stamp;
-
-            var chars = matchId.ToCharArray();
-            for (int i = 0; i < chars.Length; i++)
-            {
-                char c = chars[i];
-                bool ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                          || (c >= '0' && c <= '9') || c == '-' || c == '_';
-                if (!ok) chars[i] = '_';
-            }
-            return stamp + "-" + new string(chars);
         }
     }
 }

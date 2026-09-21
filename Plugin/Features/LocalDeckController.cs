@@ -76,8 +76,20 @@ namespace MTGAEnhancementSuite.Features
             {
                 var text = LocalDeckStore.ReadText(info.deckId);
                 if (text == null) return;
-                LocalDeckStore.Update(info.deckId, newName.Trim(), text);
-                Toast.Info($"Renamed local deck to '{newName.Trim()}'");
+                LocalDeck renamed;
+                string error;
+                if (!LocalDeckStore.TryUpdate(info.deckId, newName.Trim(), text, null, out renamed, out error))
+                {
+                    // Nothing was written and nothing was deleted: the deck is
+                    // still there under its old name. Don't claim otherwise —
+                    // this is the pure-rename path, the one where the old file
+                    // used to be deleted before the new one existed.
+                    Toast.Error($"Couldn't rename local deck: {error ?? "write failed"}");
+                    return;
+                }
+                // Report the name that actually landed on disk: sanitizing and
+                // the duplicate guard can both change what the user typed.
+                Toast.Info($"Renamed local deck to '{renamed.Name}'");
                 DeckViewSelectorPatch.RebuildLocalDecks();
             }
             catch (Exception ex)

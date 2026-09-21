@@ -39,15 +39,6 @@ namespace MTGAEnhancementSuite.State
         public bool HideCardsInDeck { get; set; } = false;
 
         /// <summary>
-        /// Cartellino coi totali di forza e costituzione durante il
-        /// combattimento: quanto sta attaccando, quanto puo' ancora bloccare
-        /// chi difende. Si accende e si spegne con F8 (non c'e' ancora una
-        /// riga nel pannello Impostazioni). Vedi Features/CombatTotals.cs.
-        /// </summary>
-        [JsonProperty("combatTotals")]
-        public bool CombatTotals { get; set; } = true;
-
-        /// <summary>
         /// Salvataggio del flusso grezzo delle partite, per un futuro
         /// visualizzatore di replay. **Spento di default, di proposito:** la
         /// registrazione occupa spazio su disco e il costo reale del formato

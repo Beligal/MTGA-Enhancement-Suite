@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Security.Cryptography;
@@ -35,6 +36,31 @@ namespace MTGAEnhancementSuite
         // installazioni nate dalle sue release rifiutano cio' che firmiamo noi,
         // e viceversa. Il passaggio da una all'altra si fa reinstallando.
         private const string PublicKeyBase64 = "QFBVvAx7+8L/wyS9X6iubH5Sn3ezZuz1KbUc3BGlrLk=";
+
+        // Il protocollo dello staging, condiviso con MTGAESBootstrapper
+        // (Bootstrapper.cs). Le due assembly non condividono codice: questi
+        // quattro nomi sono scritti a mano in tutti e due i file, e cambiarne
+        // uno solo da una parte rompe l'aggiornamento in silenzio.
+        //
+        //   .download        scaricato, non ancora verificato. Il bootstrapper
+        //                    non lo guarda: non e' installabile per costruzione.
+        //   .pending         scaricato E verificato, pronto da installare.
+        //   staged.ok        elenco dei file con i loro hash e quanti sono.
+        //                    Pubblicato per temporaneo e rinomina, cosi' o c'e'
+        //                    tutto o non c'e': la sua presenza rende il gruppo
+        //                    installabile.
+        //   transaction.txt  il registro. Scritto PRIMA di toccare qualunque file
+        //                    installato, elenca quali sono e porta uno stato:
+        //                    installing / installed / confirmed. Solo
+        //                    "confirmed" autorizza a cancellare un backup; gli
+        //                    altri due vogliono dire "rimetti a posto". Non
+        //                    esiste nessuna regola che legga l'ASSENZA del
+        //                    registro come permesso di fare pulizia.
+        internal const string DownloadSuffix = ".download";
+        internal const string PendingSuffix = ".pending";
+        internal const string StagedMarkerName = "staged.ok";
+        internal const string JournalName = "transaction.txt";
+        internal const string StateConfirmed = "confirmed";
 
         public static IEnumerator CheckForUpdate()
         {
@@ -163,6 +189,9 @@ namespace MTGAEnhancementSuite
                     if (!Directory.Exists(updateDir))
                         Directory.CreateDirectory(updateDir);
 
+                    // Scarti di un tentativo interrotto prima d'ora.
+                    ClearStagingArtifacts(updateDir);
+
                     // Il manifest e' obbligatorio: e' l'unica cosa firmata, e senza
                     // di lui non c'e' modo di sapere se quello che stiamo per
                     // installare arriva da noi. Prima una release senza manifest
@@ -185,9 +214,18 @@ namespace MTGAEnhancementSuite
                     }
                     Plugin.Log.LogInfo("AutoUpdater: Manifest signature verified");
 
-                    // Download DLL
-                    var dllPath = Path.Combine(updateDir, "MTGAEnhancementSuite.dll.pending");
-                    DownloadFile(dllUrl, dllPath);
+                    // Si scarica su *.download, NON su *.pending. Prima il file
+                    // arrivava direttamente con l'estensione che il bootstrapper
+                    // considera installabile, e la verifica dell'hash veniva
+                    // dopo: se il gioco veniva chiuso a meta' scaricamento
+                    // restava li' un DLL troncato e pronto da installare, e la
+                    // pulizia prevista per gli errori non poteva scattare perche'
+                    // il processo non c'era piu'. Adesso niente diventa
+                    // installabile finche' non e' stato verificato tutto quanto.
+                    var staged = new List<string>();
+
+                    var dllDownload = Path.Combine(updateDir, "MTGAEnhancementSuite.dll" + DownloadSuffix);
+                    DownloadFile(dllUrl, dllDownload);
 
                     // L'hash del DLL e' obbligatorio quanto il manifest: e' il file
                     // che poi viene eseguito dentro il gioco. Un manifest firmato ma
@@ -196,38 +234,69 @@ namespace MTGAEnhancementSuite
                     if (expectedDllHash == null)
                     {
                         downloadFailReason = "manifest has no hash for MTGAEnhancementSuite.dll — update rejected";
-                        File.Delete(dllPath);
                         return;
                     }
-                    if (!VerifyFileHash(dllPath, expectedDllHash))
+                    if (!VerifyFileHash(dllDownload, expectedDllHash))
                     {
                         downloadFailReason = "DLL hash mismatch — update rejected";
-                        File.Delete(dllPath);
                         return;
                     }
                     Plugin.Log.LogInfo("AutoUpdater: DLL hash verified");
+                    staged.Add("MTGAEnhancementSuite.dll");
 
                     // Download bootstrapper (if available)
                     if (bootstrapperUrl != null)
                     {
-                        var bsPath = Path.Combine(updateDir, "MTGAESBootstrapper.dll.pending");
-                        DownloadFile(bootstrapperUrl, bsPath);
+                        var bsDownload = Path.Combine(updateDir, "MTGAESBootstrapper.dll" + DownloadSuffix);
+                        DownloadFile(bootstrapperUrl, bsDownload);
 
                         // Anche questo e' codice che verra' eseguito (all'avvio, per
                         // spostare i file al loro posto): se il manifest non lo elenca,
                         // la release e' malformata e non la installiamo.
                         var expectedBsHash = manifest["files"]?["MTGAESBootstrapper.dll"]?.ToString();
-                        if (expectedBsHash == null || !VerifyFileHash(bsPath, expectedBsHash))
+                        if (expectedBsHash == null || !VerifyFileHash(bsDownload, expectedBsHash))
                         {
                             downloadFailReason = expectedBsHash == null
                                 ? "manifest has no hash for MTGAESBootstrapper.dll — update rejected"
                                 : "Bootstrapper hash mismatch — update rejected";
-                            File.Delete(dllPath);
-                            File.Delete(bsPath);
                             return;
                         }
                         Plugin.Log.LogInfo("AutoUpdater: Bootstrapper hash verified");
+                        staged.Add("MTGAESBootstrapper.dll");
                     }
+
+                    // Tutto scaricato e tutto verificato. Adesso si pubblica, e
+                    // l'ordine e' la garanzia: prima i rinomini a *.pending, il
+                    // marcatore per ULTIMO. Interrotti nel mezzo, al prossimo
+                    // avvio il bootstrapper trova dei .pending senza marcatore e
+                    // li butta via invece di installarli.
+                    foreach (var name in staged)
+                    {
+                        var from = Path.Combine(updateDir, name + DownloadSuffix);
+                        var to = Path.Combine(updateDir, name + PendingSuffix);
+                        if (File.Exists(to)) File.Delete(to);
+                        File.Move(from, to);
+                    }
+
+                    var marker = new StringBuilder();
+                    marker.AppendLine("version=" + remoteVersion);
+                    marker.AppendLine("files=" + staged.Count);
+                    foreach (var name in staged)
+                        marker.AppendLine(name + "=" + Sha256Hex(Path.Combine(updateDir, name + PendingSuffix)));
+
+                    // Anche il marcatore va pubblicato per temporaneo e rinomina,
+                    // ed e' lo stesso principio applicato ai mazzi. Scriverlo per
+                    // ultimo dice QUANDO comincia a esistere, non che sia
+                    // completo: un WriteAllText interrotto a meta' puo' lasciare
+                    // un elenco parziale, e il bootstrapper installerebbe un
+                    // pezzo dell'aggiornamento credendolo intero. Il rinomina e'
+                    // indivisibile, e la riga files= rende la completezza una
+                    // cosa che si verifica invece che si spera.
+                    var markerPath = Path.Combine(updateDir, StagedMarkerName);
+                    var markerTmp = markerPath + ".tmp";
+                    File.WriteAllText(markerTmp, marker.ToString());
+                    if (File.Exists(markerPath)) File.Delete(markerPath);
+                    File.Move(markerTmp, markerPath);
 
                     downloadSuccess = true;
                 }
@@ -250,27 +319,191 @@ namespace MTGAEnhancementSuite
             }
             else
             {
-                // Ripulire non e' cortesia: e' necessario. I file scaricati si
-                // chiamano *.pending, e al prossimo avvio il bootstrapper mette al
-                // loro posto *qualunque* .pending trovi, senza guardarci dentro. Se
-                // la rete cade a meta' download il file resta li' troncato, e le
-                // uscite controllate qui sopra non lo coprono: cancellarlo per
-                // eccezione e' l'unico punto che le copre tutte.
+                // Ripulire resta necessario, ma non e' piu' l'unica difesa:
+                // adesso gli scarti si chiamano *.download e il bootstrapper non
+                // li guarda, e un gruppo senza marcatore viene scartato comunque.
+                // Questo e' il caso in cui siamo ancora vivi per farlo noi.
+                //
+                // Si tolgono i soli scarti dello staging e non la cartella
+                // intera, perche' li' dentro puo' esserci applied.ok, cioe' un
+                // aggiornamento appena applicato che aspetta conferma: portarlo
+                // via vorrebbe dire perdere la possibilita' di tornare indietro.
                 try
                 {
-                    if (Directory.Exists(updateDir))
-                        Directory.Delete(updateDir, true);
+                    ClearStagingArtifacts(updateDir);
                 }
                 catch (Exception ex)
                 {
                     Plugin.Log.LogWarning(
                         $"AutoUpdater: could not clean up {updateDir}: {ex.Message}. " +
-                        "Delete it by hand before restarting, or a partial download may be installed.");
+                        "Delete it by hand before restarting.");
                 }
 
                 Toast.Warning("Failed to download MTGA+ update.");
                 Plugin.Log.LogError($"AutoUpdater: Update failed: {downloadFailReason}");
             }
+        }
+
+        /// <summary>
+        /// Chiamata dal plugin appena e' in esecuzione. La sua esecuzione E' la
+        /// conferma: il DLL nuovo si e' caricato, quindi i backup che il
+        /// bootstrapper aveva tenuto da parte possono andarsene.
+        ///
+        /// Se non gira — perche' la build nuova non parte, o perche' e' partita
+        /// male — il registro e i backup sopravvivono, e al prossimo avvio il
+        /// bootstrapper rimette a posto la versione precedente. Prima i backup
+        /// venivano cancellati dentro lo stesso Awake che applicava
+        /// l'aggiornamento, cioe' prima che qualcuno avesse visto il plugin
+        /// nuovo funzionare: se non partiva, non c'era piu' niente a cui tornare.
+        ///
+        /// Il chiamante decide QUANDO siamo "in esecuzione": non basta essere
+        /// entrati in Awake, perche' i blocchi che applicano le patch
+        /// intercettano i propri errori e si arriverebbe qui lo stesso.
+        /// </summary>
+        public static void ConfirmUpdateApplied()
+        {
+            try
+            {
+                var pluginDir = Path.GetDirectoryName(
+                    System.Reflection.Assembly.GetExecutingAssembly().Location);
+                var updateDir = Path.Combine(pluginDir, "update");
+                var journalPath = Path.Combine(updateDir, JournalName);
+                if (!File.Exists(journalPath)) return;
+
+                var version = "?";
+                var files = new List<string>();
+                foreach (var raw in File.ReadAllLines(journalPath))
+                {
+                    var line = raw.Trim();
+                    var eq = line.IndexOf('=');
+                    if (eq <= 0 || eq == line.Length - 1) continue;
+                    var key = line.Substring(0, eq).Trim();
+                    var value = line.Substring(eq + 1).Trim();
+                    if (key == "version") version = value;
+                    else if (key == "file") files.Add(value);
+                }
+
+                // Prima si SCRIVE che la transazione e' confermata, poi si tocca
+                // qualcosa. L'ordine e' tutto: morendo fra le due cose, il
+                // bootstrapper al prossimo avvio legge "confirmed" e finisce le
+                // pulizie, invece di leggere uno stato da recuperare e disfare
+                // un aggiornamento che invece funziona.
+                //
+                // Se questa scrittura non riesce non si cancella niente: si
+                // resta in uno stato da recuperare, che e' il lato giusto in cui
+                // sbagliare.
+                if (!SetJournalState(journalPath, StateConfirmed))
+                {
+                    Plugin.Log.LogWarning(
+                        "AutoUpdater: could not mark the update confirmed — leaving the backups in place.");
+                    return;
+                }
+
+                // Solo i backup che QUESTA transazione ha creato, non tutti i
+                // *.bak della cartella: un backup di qualcun altro non e' roba
+                // nostra da cancellare, ed e' il registro a dire quali sono.
+                var removed = 0;
+                var allGone = true;
+                foreach (var name in files)
+                {
+                    var bak = Path.Combine(pluginDir, name + ".bak");
+                    try { if (File.Exists(bak)) { File.Delete(bak); removed++; } }
+                    catch (Exception ex)
+                    {
+                        allGone = false;
+                        Plugin.Log.LogWarning(
+                            $"AutoUpdater: could not remove backup {name}.bak: {ex.Message}");
+                    }
+                }
+
+                if (!allGone)
+                {
+                    // Il registro resta, con lo stato "confirmed": il prossimo
+                    // avvio finira' le pulizie e non ripristinera' niente.
+                    Plugin.Log.LogInfo(
+                        $"AutoUpdater: update v{version} confirmed running — {removed} backup(s) removed, "
+                        + "the rest will be cleared on the next launch");
+                    return;
+                }
+
+                File.Delete(journalPath);
+                try { if (Directory.GetFiles(updateDir).Length == 0) Directory.Delete(updateDir); } catch { }
+
+                Plugin.Log.LogInfo(
+                    $"AutoUpdater: update v{version} confirmed running — {removed} backup(s) removed");
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"AutoUpdater.ConfirmUpdateApplied: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Riscrive lo stato dentro il registro, per temporaneo e rinomina, cosi'
+        /// che non possa esistere un registro mezzo scritto. Restituisce false se
+        /// non c'e' riuscita: in quel caso il chiamante non deve cancellare
+        /// niente, perche' sul disco lo stato precedente vale ancora.
+        /// </summary>
+        private static bool SetJournalState(string journalPath, string state)
+        {
+            try
+            {
+                var lines = new List<string>();
+                var written = false;
+                foreach (var raw in File.ReadAllLines(journalPath))
+                {
+                    var line = raw.Trim();
+                    if (line.StartsWith("state=", StringComparison.Ordinal))
+                    {
+                        if (written) continue;
+                        lines.Add("state=" + state);
+                        written = true;
+                    }
+                    else lines.Add(raw);
+                }
+                if (!written) lines.Insert(0, "state=" + state);
+
+                var tmp = journalPath + ".tmp";
+                File.WriteAllLines(tmp, lines.ToArray());
+                if (File.Exists(journalPath)) File.Delete(journalPath);
+                File.Move(tmp, journalPath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"AutoUpdater.SetJournalState: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Toglie gli scarti dello staging: scaricati, verificati-ma-non-ancora
+        /// -installati, marcatore di staging e manifest. NON tocca il registro.
+        /// </summary>
+        private static void ClearStagingArtifacts(string updateDir)
+        {
+            if (!Directory.Exists(updateDir)) return;
+
+            foreach (var pattern in new[] { "*" + DownloadSuffix, "*" + PendingSuffix })
+                foreach (var f in Directory.GetFiles(updateDir, pattern))
+                    try { File.Delete(f); } catch { }
+
+            foreach (var f in Directory.GetFiles(updateDir, "*.tmp"))
+                try { File.Delete(f); } catch { }
+
+            foreach (var name in new[] { StagedMarkerName, "manifest.json" })
+            {
+                var p = Path.Combine(updateDir, name);
+                try { if (File.Exists(p)) File.Delete(p); } catch { }
+            }
+        }
+
+        /// <summary>SHA-256 di un file, in esadecimale minuscolo.</summary>
+        private static string Sha256Hex(string filePath)
+        {
+            using (var sha = SHA256.Create())
+            using (var stream = File.OpenRead(filePath))
+                return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
         }
 
         /// <summary>

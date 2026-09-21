@@ -203,32 +203,18 @@ namespace MTGAEnhancementSuite.UI
                     Toast.Info(val ? "Cards in deck hidden" : "Cards in deck shown");
                 });
 
-            // Cartellino coi totali di combattimento. Vedi
-            // Features/CombatTotals.cs. Il tasto F8 fa la stessa cosa in
-            // partita, ma da qui si vede che la funzione esiste.
-            CreateToggle(_settingsContent.transform, "CombatTotalsToggle",
-                "Combat Damage Counter",
-                "During combat, shows the total power/toughness of the attackers and of the creatures that can still block, plus how much damage is stopped and how much gets through. Also on F8.",
-                new Vector2(0.05f, 0.319f), new Vector2(0.95f, 0.414f),
-                ModSettings.Instance.CombatTotals,
-                (val) =>
-                {
-                    ModSettings.Instance.CombatTotals = val;
-                    ModSettings.Instance.Save();
-                    // Se si spegne mentre una partita e' aperta dietro al
-                    // pannello, il cartellino deve sparire subito e non al
-                    // prossimo combattimento.
-                    if (!val) Features.CombatTotals.HideNow();
-                    Toast.Info(val ? "Combat counter on" : "Combat counter off");
-                });
-
             // Export collection — opens a Windows save dialog and writes the
             // owned cards in MTGA deck-list format. Useful for backing up
             // the collection or pasting into deckbuilders.
             CreateActionRow(_settingsContent.transform, "ExportCollectionRow",
                 "Export Collection",
                 "Save your owned cards to a text file (MTGA deck format) — for sharing with deckbuilders or backing up your collection.",
-                new Vector2(0.05f, 0.210f), new Vector2(0.95f, 0.305f),
+                // Risalita di un passo (0.109) il 2026-09-21, quando la riga
+                // sopra e' stata tolta: le ancore sono a mano, quindi togliere
+                // una riga in mezzo lascia un buco se non si spostano quelle
+                // sotto. Adesso le righe sono CINQUE, dalla cima 0.850 fino a
+                // 0.319.
+                new Vector2(0.05f, 0.319f), new Vector2(0.95f, 0.414f),
                 "Export…",
                 () =>
                 {

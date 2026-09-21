@@ -18,8 +18,8 @@ namespace MTGAEnhancementSuite.UI
     /// il canvas e' ConstantPixelSize e su un monitor ad alta risoluzione i
     /// valori fissi risultano minuscoli.
     ///
-    /// L'ASPETTO invece e' quello di <see cref="Features.CombatTotals"/>:
-    /// lastra arrotondata su neutri caldi, font e materiale presi dai testi
+    /// L'ASPETTO e' quello delle finestre che stanno sopra il tavolo da
+    /// gioco: lastra arrotondata su neutri caldi, font e materiale presi dai testi
     /// che Arena sta gia' mostrando, filetto sotto ai titoli di sezione. Le
     /// finestre che il mod mette sopra il tavolo da gioco si somigliano fra
     /// loro e somigliano al gioco; quelle sopra i menu (il pannello dei mazzi)
@@ -30,8 +30,8 @@ namespace MTGAEnhancementSuite.UI
     /// </summary>
     internal static class SparkyMenu
     {
-        // Stessa tavolozza del cartellino del combattimento (CombatTotals):
-        // neutri caldi e scuri, come l'interfaccia di Arena in duello. Il blu
+        // Tavolozza per le finestre sopra il tavolo da gioco: neutri caldi e
+        // scuri, come l'interfaccia di Arena in duello. Il blu
         // acciaio di prima veniva dal pannello dei mazzi, che vive su fondo blu
         // notte; qui sopra il tavolo da gioco saltava fuori come un adesivo.
         //

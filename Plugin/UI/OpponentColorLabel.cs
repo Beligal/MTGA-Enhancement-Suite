@@ -74,6 +74,42 @@ namespace MTGAEnhancementSuite.UI
             return main.ToString();
         }
 
+        /// <summary>
+        /// Le stesse lettere di <see cref="Of"/> ma in chiaro: niente tag, solo
+        /// i colori che superano la soglia. Serve dove il rich text non si puo'
+        /// usare — il nome di un file, una finestra di conferma — e sta qui
+        /// perche' la soglia dev'essere UNA: due funzioni che decidono da sole
+        /// chi e' "WB" finirebbero per non essere d'accordo.
+        ///
+        /// Restituisce stringa vuota se non si sa niente, cosi' chi compone un
+        /// nome di file puo' semplicemente saltare il pezzo.
+        /// </summary>
+        public static string Plain(MatchRecord m)
+        {
+            var counts = m.OpponentColorCards;
+            if (counts == null || counts.Length < 5) return PlainMask(m.OpponentColors);
+
+            int total = 0;
+            foreach (var n in counts) total += n;
+            if (total == 0) return PlainMask(m.OpponentColors);
+
+            var main = new System.Text.StringBuilder();
+            for (int i = 0; i < Palette.Length; i++)
+                if (counts[i] >= SplashThreshold) main.Append(Palette[i].Letter);
+
+            // Nessuno arriva alla soglia: si ricade sulla maschera, come Of().
+            return main.Length > 0 ? main.ToString() : PlainMask(m.OpponentColors);
+        }
+
+        private static string PlainMask(int mask)
+        {
+            if (mask == 0) return "";
+            var sb = new System.Text.StringBuilder();
+            foreach (var c in Palette)
+                if ((mask & c.Bit) != 0) sb.Append(c.Letter);
+            return sb.ToString();
+        }
+
         private static string Pips(int mask)
         {
             if (mask == 0) return "<color=#8080A0>?</color>";
