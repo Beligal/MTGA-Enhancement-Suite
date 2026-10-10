@@ -116,6 +116,24 @@ namespace MTGAEnhancementSuite.Features
         /// </summary>
         public static List<SourceDeck> ListDecks()
         {
+            var model = GetOpenModel();
+            return ListDecks((model != null) ? model._deckId : Guid.Empty,
+                             (model != null) ? model._deckFormat : null);
+        }
+
+        /// <summary>
+        /// Come <see cref="ListDecks()"/>, ma il mazzo da escludere e il
+        /// formato di riferimento li dice il chiamante invece di prenderli dal
+        /// deck builder.
+        ///
+        /// Serve al confronto, che si apre dalla **lista** dei mazzi: li' il
+        /// deck builder non e' aperto, e non e' verificato che
+        /// <c>DeckBuilderModelProvider</c> si svuoti quando lo si chiude — se
+        /// restasse il modello dell'ultima sessione, si escluderebbe un mazzo a
+        /// caso. Il formato serve solo al conteggio nel log.
+        /// </summary>
+        public static List<SourceDeck> ListDecks(Guid excludeId, string referenceFormat)
+        {
             var result = new List<SourceDeck>();
 
             var dm = GameReflection.PantryGet<DecksManager>();
@@ -134,9 +152,8 @@ namespace MTGAEnhancementSuite.Features
             }
             if (cached == null) return result;
 
-            var model = GetOpenModel();
-            Guid openId = (model != null) ? model._deckId : Guid.Empty;
-            string openFormat = (model != null) ? model._deckFormat : null;
+            Guid openId = excludeId;
+            string openFormat = referenceFormat;
 
             var db = GameReflection.PantryGet<CardDatabase>();
             var watch = Stopwatch.StartNew();
@@ -200,7 +217,7 @@ namespace MTGAEnhancementSuite.Features
         {
             var scan = new DeckScan { Stamp = stamp, Size = 0, Colors = CardColorFlags.None };
 
-            var pile = MainPile(deck);
+            var pile = Pile(deck, EDeckPile.Main);
             if (pile == null) return scan;
 
             var provider = db?.CardDataProvider;
@@ -254,18 +271,10 @@ namespace MTGAEnhancementSuite.Features
         {
             var result = new List<SourceCard>();
 
-            var dm = GameReflection.PantryGet<DecksManager>();
-            if (dm == null) return result;
-
-            Client_Deck deck;
-            try { deck = dm.GetDeck(deckId); }
-            catch (Exception ex)
-            {
-                Plugin.Log.LogWarning($"DeckImport: GetDeck({deckId}) fallita: {ex.Message}");
-                return result;
-            }
-
-            var pile = MainPile(deck);
+            // Un mazzo che non si legge finisce nell'avviso qui sotto, come
+            // prima dell'estrazione: Pile(null) e' null.
+            var deck = SavedDeck(deckId);
+            var pile = Pile(deck, EDeckPile.Main);
             if (pile == null || pile.Count == 0)
             {
                 Plugin.Log.LogWarning($"DeckImport: il mazzo {deckId} non ha carte nel pile principale.");
@@ -275,11 +284,62 @@ namespace MTGAEnhancementSuite.Features
             var db = GameReflection.PantryGet<CardDatabase>();
             var model = GetOpenModel();
 
-            // Chiave: il TitleId quando il database conosce la carta, altrimenti
-            // il GrpId in uno spazio di chiavi separato, cosi' due carte
-            // sconosciute diverse non finiscono nella stessa riga.
-            var byTitle = new Dictionary<ulong, SourceCard>();
-            int unknown = 0;
+            int unknown;
+            foreach (var group in GroupByName(pile, db, out unknown))
+            {
+                var entry = new SourceCard
+                {
+                    TitleId = group.TitleId,
+                    Name = group.Name,
+                    InSource = group.Quantity,
+                    // Con la stampa della PRIMA voce del gruppo, come prima
+                    // dell'estrazione: per nome il conteggio non cambia.
+                    InOpenDeck = QuantityInOpenDeck(model, group.FirstPrinting),
+                };
+                entry.Printings.AddRange(group.Printings);
+                result.Add(entry);
+            }
+
+            result.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
+
+            Plugin.Log.LogInfo(
+                $"DeckImport: mazzo {deckId} letto, {pile.Count} voci -> {result.Count} carte per nome, " +
+                $"{unknown} stampe sconosciute al database.");
+
+            return result;
+        }
+
+        /// <summary>Una carta di una pila, con tutte le sue stampe sommate.</summary>
+        internal sealed class NamedCount
+        {
+            /// <summary>
+            /// Il TitleId quando il database conosce la carta, altrimenti il
+            /// GrpId in uno spazio di chiavi separato, cosi' due carte
+            /// sconosciute diverse non finiscono nella stessa riga.
+            /// </summary>
+            public ulong Key;
+            public uint TitleId;
+            public string Name;
+            public uint Quantity;
+            /// <summary>La stampa della prima voce incontrata; null se sconosciuta.</summary>
+            public CardPrintingData FirstPrinting;
+            public List<DeckCardInserter.Entry> Printings = new List<DeckCardInserter.Entry>();
+        }
+
+        /// <summary>
+        /// Raggruppa una pila per nome (<c>TitleId</c>), nell'ordine in cui le
+        /// carte compaiono. Estratto il 2026-10-10 da <see cref="ReadDeck"/>,
+        /// che lo faceva in linea, quando e' servito anche al confronto fra
+        /// mazzi: due copie dello stesso raggruppamento avrebbero finito per
+        /// contare in due modi diversi.
+        /// </summary>
+        internal static List<NamedCount> GroupByName(List<Client_DeckCard> pile, CardDatabase db, out int unknown)
+        {
+            var result = new List<NamedCount>();
+            unknown = 0;
+            if (pile == null) return result;
+
+            var byKey = new Dictionary<ulong, NamedCount>();
 
             foreach (var card in pile)
             {
@@ -306,30 +366,43 @@ namespace MTGAEnhancementSuite.Features
                     key = 0x1_0000_0000UL | card.Id;
                 }
 
-                SourceCard entry;
-                if (!byTitle.TryGetValue(key, out entry))
+                NamedCount entry;
+                if (!byKey.TryGetValue(key, out entry))
                 {
-                    entry = new SourceCard
+                    entry = new NamedCount
                     {
+                        Key = key,
                         TitleId = titleId,
                         Name = CardName(db, card.Id),
-                        InOpenDeck = QuantityInOpenDeck(model, printing),
+                        FirstPrinting = printing,
                     };
-                    byTitle[key] = entry;
+                    byKey[key] = entry;
                     result.Add(entry);
                 }
 
-                entry.InSource += card.Quantity;
+                entry.Quantity += card.Quantity;
                 entry.Printings.Add(new DeckCardInserter.Entry(card.Id, card.Quantity));
             }
 
-            result.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
-
-            Plugin.Log.LogInfo(
-                $"DeckImport: mazzo {deckId} letto, {pile.Count} voci -> {result.Count} carte per nome, " +
-                $"{unknown} stampe sconosciute al database.");
-
             return result;
+        }
+
+        /// <summary>
+        /// Il mazzo salvato, dalla copia in memoria di <c>DecksManager</c>.
+        /// Null se non c'e' — succede con i mazzi locali, che Arena non
+        /// conosce.
+        /// </summary>
+        internal static Client_Deck SavedDeck(Guid deckId)
+        {
+            var dm = GameReflection.PantryGet<DecksManager>();
+            if (dm == null) return null;
+
+            try { return dm.GetDeck(deckId); }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogWarning($"DeckImport: GetDeck({deckId}) fallita: {ex.Message}");
+                return null;
+            }
         }
 
         // -----------------------------------------------------------------
@@ -466,12 +539,19 @@ namespace MTGAEnhancementSuite.Features
             }
         }
 
-        private static List<Client_DeckCard> MainPile(Client_Deck deck)
+        /// <summary>
+        /// Una delle pile del mazzo. Le pile sono quattro — <c>Main</c>,
+        /// <c>Sideboard</c>, <c>CommandZone</c>, <c>Companions</c> — e
+        /// <c>Client_DeckContents</c> le crea tutte nel costruttore
+        /// (SharedClientCore.dll, decompilato il 2026-10-10); null solo se il
+        /// mazzo non ha contenuti.
+        /// </summary>
+        internal static List<Client_DeckCard> Pile(Client_Deck deck, EDeckPile kind)
         {
             var contents = deck?.Contents;
             if (contents?.Piles == null) return null;
             List<Client_DeckCard> pile;
-            return contents.Piles.TryGetValue(EDeckPile.Main, out pile) ? pile : null;
+            return contents.Piles.TryGetValue(kind, out pile) ? pile : null;
         }
 
         /// <summary>

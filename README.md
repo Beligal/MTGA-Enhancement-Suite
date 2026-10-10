@@ -190,6 +190,37 @@ is not there. Results are kept per Arena account, one line per match, in
 
 Draws count as matches played but stay out of the win rate, in both directions.
 
+### Compare Decks
+**Right-click any deck** in the deck list and pick **Compare with...**, then
+double-click the second deck. You get both decks side by side, one line per
+card, with how many copies each runs — the deck you right-clicked on the left,
+the one you picked on the right:
+
+```
+Mono-G Elves  vs  Simic Ramp
+
+Main deck          60   60
+Bounce Off          0    2
+Hedron Archive      2    0
+Llanowar Elves      4    3
+Breeding Pool       4    4
+```
+
+Cards that differ come first, then the ones the two decks share, each group in
+alphabetical order. The higher number of each line is highlighted. Cards are
+matched **by name, not by printing**, so two different arts of the same card
+count as the same card. Sideboard, commander and companion get their own
+section when either deck has one.
+
+**Swap** flips the two sides, **Change...** picks a different deck for the
+right side, **Hide identical** leaves only the differences, and **Copy** puts
+the comparison on the clipboard as plain text. Nothing in either deck is
+changed.
+
+Local decks cannot be compared yet: Arena does not know about them, and the only
+way to read one goes through Arena's importer, which lowers each card to the
+copies you own — the comparison would show differences that are not in the deck.
+
 ### Replays
 **Off by default.** Click **MTGA+** in the navigation bar, then **Replays…** —
 that window lists every recording you have, newest first, whichever deck it was
@@ -279,7 +310,7 @@ match.
 2. Click it to open the panel: gameplay settings and **Export Collection**
 3. In the **MTGA+** panel, **Replays…** lists every recorded match and opens any of them
 4. In the deck builder, the gold button to the right of the filter bar handles **card presets**, **Add from another deck** and **deck name styling**
-5. In the deck list, right-click a **folder header** for folder actions, right-click a **deck** for its statistics or to style its name, or select several decks for bulk move and delete
+5. In the deck list, right-click a **folder header** for folder actions, right-click a **deck** for its statistics, to compare it with another deck or to style its name, or select several decks for bulk move and delete
 6. Press **F7** in a match to fast-forward animations
 7. Press **F9** before a Sparky game to pick its deck and how it plays
 

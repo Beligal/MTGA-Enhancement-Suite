@@ -35,7 +35,7 @@ namespace MTGAEnhancementSuite.UI
             float width = Mathf.Clamp(Screen.width * 0.16f, 230f, 380f);
             float fontSize = Mathf.Max(14f, rowHeight * 0.45f);
             float padding = Mathf.Max(6f, rowHeight * 0.2f);
-            float height = padding * 2 + rowHeight * 2;
+            float height = padding * 2 + rowHeight * 3;
 
             var mouse = Mouse.current;
             Vector2 at = mouse != null ? mouse.position.ReadValue()
@@ -81,6 +81,8 @@ namespace MTGAEnhancementSuite.UI
             float y = -padding;
             Row(menu.transform, ref y, rowHeight, padding, fontSize, "Deck statistics",
                 () => { Close(); DeckStatsWindow.Show(deckId, deckName); });
+            Row(menu.transform, ref y, rowHeight, padding, fontSize, "Compare with...",
+                () => { Close(); DeckCompareWindow.PickAndShow(deckId); });
             Row(menu.transform, ref y, rowHeight, padding, fontSize, "Style name...",
                 () => { Close(); DeckNameController.OpenForDeck(deckId); });
         }

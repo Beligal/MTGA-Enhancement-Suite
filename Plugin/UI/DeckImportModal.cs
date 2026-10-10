@@ -95,8 +95,48 @@ namespace MTGAEnhancementSuite.UI
         private static Guid _lastClickedDeck;
         private static float _lastClickTime;
 
+        // --- a cosa serve la schermata dei mazzi ---
+        //
+        // Dal 2026-10-10 la prima schermata sceglie un mazzo anche per il
+        // confronto (DeckCompareWindow). Cambiano solo i testi, il formato di
+        // riferimento e cosa fa il doppio click: ricerca, colori e lista sono
+        // gli stessi, e duplicarli avrebbe voluto dire due selettori che
+        // divergono alla prima correzione.
+        private sealed class PickerMode
+        {
+            public string Title;
+            public string Hint;
+            public string NothingToPick;
+            /// <summary>Coda dell'etichetta quando sono mostrati tutti i formati.</summary>
+            public string AllFormatsNote;
+            /// <summary>Vive per la sessione, separato per ciascun uso.</summary>
+            public bool ShowAllFormats;
+            public string ReferenceFormat;
+            public Action<DeckImportManager.SourceDeck> OnPicked;
+        }
+
+        private static readonly PickerMode ImportMode = new PickerMode
+        {
+            Title = "Add from another deck",
+            Hint = "Double-click a deck to see its cards.",
+            NothingToPick = "No other decks to import from.",
+            AllFormatsNote = " - cards may be illegal here",
+            ShowAllFormats = false,
+        };
+
+        // Per confrontare si parte da tutti i formati: Standard contro
+        // Historic e' un confronto legittimo, aggiungere carte illegali no.
+        private static readonly PickerMode CompareMode = new PickerMode
+        {
+            Hint = "Double-click a deck to compare with it.",
+            NothingToPick = "No other decks to compare with.",
+            AllFormatsNote = "",
+            ShowAllFormats = true,
+        };
+
+        private static PickerMode _mode = ImportMode;
+
         // --- filtri, vivono per la sessione ---
-        private static bool _showAllFormats;
         private static string _search = "";
         private static CardColorFlags _colorFilter = CardColorFlags.None;
         private static readonly Dictionary<CardColorFlags, Image> _colorButtons =
@@ -123,7 +163,40 @@ namespace MTGAEnhancementSuite.UI
                 return;
             }
 
+            _mode = ImportMode;
+            ImportMode.ReferenceFormat = DeckImportManager.OpenDeckFormat();
+            ImportMode.OnPicked = OpenCards;
+
             _decks = DeckImportManager.ListDecks();
+            _cards = null;
+            _search = "";
+            _lastClickedDeck = Guid.Empty;
+            ShowDeckList();
+        }
+
+        /// <summary>
+        /// La stessa schermata dei mazzi, per scegliere con cosa confrontare
+        /// <paramref name="excludeId"/>. Il mazzo scelto arriva a
+        /// <paramref name="onPicked"/> a finestra gia' chiusa.
+        /// </summary>
+        public static void PickDeckToCompare(Guid excludeId, string excludeName, string referenceFormat,
+                                             Action<Guid> onPicked)
+        {
+            _mode = CompareMode;
+            // Il nome del mazzo sta IN FONDO al titolo: puo' contenere i tag
+            // dell'editor dei nomi, che non vengono mai chiusi, e qualunque
+            // cosa lo seguisse ne erediterebbe colore e stile.
+            CompareMode.Title = string.IsNullOrEmpty(excludeName)
+                ? "Compare with..."
+                : "Compare " + excludeName;
+            CompareMode.ReferenceFormat = referenceFormat;
+            CompareMode.OnPicked = deck =>
+            {
+                Close();
+                onPicked?.Invoke(deck.Id);
+            };
+
+            _decks = DeckImportManager.ListDecks(excludeId, referenceFormat);
             _cards = null;
             _search = "";
             _lastClickedDeck = Guid.Empty;
@@ -149,9 +222,9 @@ namespace MTGAEnhancementSuite.UI
         // -----------------------------------------------------------------
         private static void ShowDeckList()
         {
-            // Il formato del mazzo aperto si legge una volta sola qui: dentro
-            // il ciclo sarebbe una lookup nel Pantry per ogni mazzo.
-            string openFormat = DeckImportManager.OpenDeckFormat();
+            // Il formato di riferimento si legge una volta sola, all'apertura:
+            // dentro il ciclo sarebbe una lookup nel Pantry per ogni mazzo.
+            string openFormat = _mode.ReferenceFormat;
 
             int sameFormatCount = 0;
             foreach (var deck in _decks)
@@ -168,15 +241,15 @@ namespace MTGAEnhancementSuite.UI
             // credo contengano la stessa stringa ma che non ho verificato a
             // runtime. Se non combaciassero, senza questa riga la finestra si
             // aprirebbe vuota e sembrerebbe rotta.
-            if (sameFormatCount == 0 && _decks.Count > 0 && !_showAllFormats)
+            if (sameFormatCount == 0 && _decks.Count > 0 && !_mode.ShowAllFormats)
             {
-                _showAllFormats = true;
+                _mode.ShowAllFormats = true;
                 Plugin.Log.LogInfo(
                     $"DeckImport: nessuno dei {_decks.Count} mazzi e' nel formato " +
                     $"'{openFormat ?? "?"}': mostro tutti i formati da solo.");
             }
 
-            var dialog = BeginModal("Add from another deck", 0.155f, 0.785f, out var footer);
+            var dialog = BeginModal(_mode.Title, 0.155f, 0.785f, out var footer);
 
             BuildSearchRow(dialog);
             BuildColorRow(dialog);
@@ -184,7 +257,7 @@ namespace MTGAEnhancementSuite.UI
             TextMeshProUGUI formatLabel;
             _formatButtonImage = MakeButton(footer, "", out formatLabel,
                 new Vector2(0.00f, 0f), new Vector2(0.62f, 1f), ButtonIdle,
-                () => { _showAllFormats = !_showAllFormats; RebuildDeckRows(); });
+                () => { _mode.ShowAllFormats = !_mode.ShowAllFormats; RebuildDeckRows(); });
             _formatButtonLabel = formatLabel;
 
             TextMeshProUGUI ignored;
@@ -193,7 +266,7 @@ namespace MTGAEnhancementSuite.UI
                 new Color(0.25f, 0.25f, 0.32f, 1f),
                 Close);
 
-            SetHint("Double-click a deck to see its cards.");
+            SetHint(_mode.Hint);
             RebuildDeckRows();
         }
 
@@ -208,7 +281,7 @@ namespace MTGAEnhancementSuite.UI
 
             ClearChildren(_listContent);
 
-            string openFormat = DeckImportManager.OpenDeckFormat();
+            string openFormat = _mode.ReferenceFormat;
             string needle = (_search ?? "").Trim();
 
             int hiddenByFormat = 0, shown = 0;
@@ -217,7 +290,7 @@ namespace MTGAEnhancementSuite.UI
             {
                 bool sameFormat = DeckImportManager.MatchesFormat(deck, openFormat);
                 if (!sameFormat) hiddenByFormat++;
-                if (!sameFormat && !_showAllFormats) continue;
+                if (!sameFormat && !_mode.ShowAllFormats) continue;
 
                 if (needle.Length > 0 &&
                     (deck.Name == null ||
@@ -237,7 +310,7 @@ namespace MTGAEnhancementSuite.UI
             if (shown == 0)
             {
                 string why;
-                if (_decks.Count == 0) why = "No other decks to import from.";
+                if (_decks.Count == 0) why = _mode.NothingToPick;
                 else if (needle.Length > 0) why = $"No deck matches \"{needle}\".";
                 else if (_colorFilter != CardColorFlags.None) why = "No deck in those colors.";
                 else why = "No decks in this format - turn on \"show all formats\" below.";
@@ -246,15 +319,20 @@ namespace MTGAEnhancementSuite.UI
 
             if (_formatButtonLabel != null)
             {
-                if (_showAllFormats)
-                    _formatButtonLabel.text = "[x] showing all formats - cards may be illegal here";
+                if (_mode.ShowAllFormats)
+                    _formatButtonLabel.text = "[x] showing all formats" + _mode.AllFormatsNote;
                 else if (hiddenByFormat == 0)
                     _formatButtonLabel.text = "all your decks are in this format";
                 else
                     _formatButtonLabel.text = $"[ ] show all formats ({hiddenByFormat} more deck(s))";
             }
             if (_formatButtonImage != null)
-                _formatButtonImage.color = _showAllFormats ? new Color(0.45f, 0.35f, 0.18f, 1f) : ButtonIdle;
+            {
+                // L'ambra avvisa che si sta uscendo dal formato: ha senso solo
+                // dove questo puo' produrre un mazzo illegale.
+                bool warn = _mode.ShowAllFormats && !string.IsNullOrEmpty(_mode.AllFormatsNote);
+                _formatButtonImage.color = warn ? new Color(0.45f, 0.35f, 0.18f, 1f) : ButtonIdle;
+            }
         }
 
         private static void BuildSearchRow(Transform dialog)
@@ -414,6 +492,12 @@ namespace MTGAEnhancementSuite.UI
 
             if (!isDouble) return;
 
+            _mode.OnPicked?.Invoke(deck);
+        }
+
+        /// <summary>Il doppio click di "add from another deck": apre le carte del mazzo.</summary>
+        private static void OpenCards(DeckImportManager.SourceDeck deck)
+        {
             _openDeckName = deck.Name;
             _cards = DeckImportManager.ReadDeck(deck.Id);
 
