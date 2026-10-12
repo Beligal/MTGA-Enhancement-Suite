@@ -1,7 +1,7 @@
 # Changelog
 
-What changed in each version of this fork, newest first. Dates are the dates of
-the commits, not of a GitHub release.
+What changed in each version of this fork, newest first. Dates are the day the
+release was published on GitHub (Italian time).
 
 Entries say what changed and, where it is not obvious, why. The reasoning behind
 a particular decision is usually in a comment at the top of the file that owns
@@ -9,11 +9,7 @@ it; the full diff is in `git log`.
 
 ---
 
-## 0.23.0 — in development
-
-The source carries `0.23.0` so that a development build is never replaced by the
-published `0.22.0` at launch: the auto-updater installs a release only when its
-version is **greater** than the one compiled in.
+## 0.23.0 — 2026-10-12
 
 ### Added
 
@@ -37,10 +33,7 @@ which lowers every card to the copies you own.
 
 ## 0.22.0 — 2026-09-22
 
-The largest release of the fork so far. The release artefacts (MSI, signed
-manifest, icons) were built on this machine on 2026-09-22; **whether they were
-published to GitHub cannot be checked from here** and has to be confirmed in the
-browser.
+The largest release of the fork so far.
 
 ### Added
 
