@@ -9,6 +9,40 @@ it; the full diff is in `git log`.
 
 ---
 
+## 0.23.1 — 2026-10-13
+
+Compatibility release for the Arena update of 2026-10-13. No new features.
+
+### Fixed
+
+**Home screen stuck after the Arena update.** The Home page stayed dimmed with
+an empty play panel on the right; Profile, Decks and the other tabs still
+worked. Arena changed the parameters of the method that sets up a deck folder
+(two new ones, for its new multi-select of decks by click-and-hold), and the
+mod was still calling the old version to build your custom folders and the
+Local Decks folder. The error stopped Arena halfway through building the Home
+page.
+
+Custom folders now get the same multi-select wiring as Arena's own folders. The
+Local Decks folder does not: its decks exist only on your computer, and
+multi-select acts on decks stored by Arena. The patch also catches this kind of
+error at its outer edge now, so if a future Arena update breaks it again you
+lose the custom folders, not the Home page.
+
+**Simplified cards in the examine view.** With **Force Simplified Cards** on,
+examining a card no longer simplified it: Arena rewrote the examine view and
+the method the mod relied on is gone. Arena now opens every card as it is and
+offers the simplified version as a separate state, with its own **View
+Simplified** button. The mod switches to that state when the card is opened,
+the same way the button does, so the button shows as on and a second click
+brings the styled card back. Basic lands, frameless and full-art printings
+stay as they are, as on the battlefield.
+
+Cards already simplified on the battlefield open simplified and show no View
+Simplified button, because there is no style left to remove.
+
+---
+
 ## 0.23.0 — 2026-10-12
 
 ### Added

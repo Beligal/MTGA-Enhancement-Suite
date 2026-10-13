@@ -7,6 +7,7 @@ using MTGAEnhancementSuite.State;
 using Wotc.Mtga.Cards.Database;
 using Wotc.Mtga.DuelScene;
 using Wotc.Mtga.DuelScene.Examine;
+using Core.DuelScene.CardHolders.Examine;
 
 namespace MTGAEnhancementSuite.Patches
 {
@@ -27,11 +28,17 @@ namespace MTGAEnhancementSuite.Patches
     ///    stessa <c>CardSimplifier.Simplify</c> con lo stesso contesto
     ///    (<c>ModelOverride</c>, <c>keepArtId: true</c>).
     ///
-    /// B) FINESTRA DI ESAME — <c>ExamineViewCardHolder.SetExamineState</c>
-    ///    Riscriviamo il solo stato <c>Styled</c> in <c>Unstyled</c>. Gli altri
-    ///    stati (Printing, Instance, Specialize...) restano intatti, quindi il
-    ///    pulsante "view printing" continua a funzionare. Le carte senza stile
-    ///    usano <c>Instance</c> e non vengono toccate.
+    /// B) FINESTRA DI ESAME — <c>ExamineManager.Examine</c> (postfix)
+    ///    Dall'aggiornamento di Arena del 2026-10-13 la finestra parte sempre
+    ///    da <c>Instance</c> e lo stato semplificato (<c>Unstyled</c>) e' una
+    ///    scelta a parte, col pulsante nativo "View Simplified". Dopo Examine
+    ///    passiamo a quello stato con lo stesso <c>ToggleSimplified</c> del
+    ///    pulsante: il pulsante resta coerente e un secondo clic riporta la
+    ///    carta con lo stile. Se Arena non offre lo stato semplificato (carta
+    ///    senza stile, coperta, gia' forzata) non si tocca niente.
+    ///    Fino al 2026-10-12 era un prefix su
+    ///    <c>ExamineViewCardHolder.SetExamineState</c>, che riscriveva
+    ///    <c>Styled</c> in <c>Unstyled</c>: quel metodo non esiste piu'.
     ///
     /// Il toggle e' letto a ogni invocazione: spegnendolo si torna al
     /// comportamento originale senza riavviare.
@@ -68,7 +75,6 @@ namespace MTGAEnhancementSuite.Patches
         private static bool _warnedFaceMismatch;
         private static bool _warnedStaleOverride;
         private static bool _warnedLandFrame;
-        private static FieldInfo _examineSourceModelField;
 
         public static void Apply(Harmony harmony)
         {
@@ -169,24 +175,15 @@ namespace MTGAEnhancementSuite.Patches
             // --- B) finestra di esame ---
             try
             {
-                var target = AccessTools.Method(typeof(ExamineViewCardHolder), "SetExamineState");
+                var target = AccessTools.Method(typeof(ExamineManager), nameof(ExamineManager.Examine));
                 if (target == null)
                 {
-                    Plugin.Log.LogWarning("ForceSimplified: ExamineViewCardHolder.SetExamineState non trovato, patch B saltata.");
+                    Plugin.Log.LogWarning("ForceSimplified: ExamineManager.Examine non trovato, patch B saltata.");
                 }
                 else
                 {
-                    // Serve a sapere QUALE carta si sta esaminando: senza,
-                    // la guardia 6 nella finestra di esame non puo' decidere
-                    // e si torna al comportamento precedente (riscrivere
-                    // sempre Styled in Unstyled).
-                    _examineSourceModelField = AccessTools.Field(typeof(ExamineViewCardHolder), "_sourceModel");
-                    Plugin.Log.LogInfo(_examineSourceModelField != null
-                        ? "ForceSimplified: ExamineViewCardHolder._sourceModel trovato, guardia 6 attiva anche in esame."
-                        : "ForceSimplified: ExamineViewCardHolder._sourceModel NON trovato: in esame terre base e stampe senza cornice verranno semplificate lo stesso.");
-
-                    harmony.Patch(target, prefix: new HarmonyMethod(
-                        typeof(ForceSimplifiedPatch), nameof(SetExamineState_Prefix)));
+                    harmony.Patch(target, postfix: new HarmonyMethod(
+                        typeof(ForceSimplifiedPatch), nameof(Examine_Postfix)));
                     Plugin.Log.LogInfo("ForceSimplified: patch B (finestra di esame) applicata.");
                 }
             }
@@ -733,25 +730,6 @@ namespace MTGAEnhancementSuite.Patches
         }
 
         /// <summary>
-        /// La carta che la finestra di esame sta mostrando, o null se non si
-        /// riesce a saperlo.
-        ///
-        /// <c>_sourceModel</c> e' assegnato da <c>ExamineCard(model, holder)</c>
-        /// **prima** della chiamata a <c>SetExamineState</c>, e riassegnato solo
-        /// da <c>Clear()</c>: quando il nostro prefix gira, il campo contiene
-        /// gia' la carta giusta — anche quando l'utente preme il pulsante, che
-        /// chiama <c>SetExamineState</c> senza ripassare da <c>ExamineCard</c>.
-        /// [VERIFIED su Core.dll]
-        /// </summary>
-        private static ICardDataAdapter ModelloEsaminato(ExamineViewCardHolder holder)
-        {
-            if (holder == null || _examineSourceModelField == null) return null;
-            var model = _examineSourceModelField.GetValue(holder) as ICardDataAdapter;
-            if (model == null || model.Printing == null) return null;
-            return model;
-        }
-
-        /// <summary>
         /// A2/A3) Azzera l override quando il CDC torna nel pool o cambia carta.
         /// Se i visual verranno aggiornati, CheckSimplifyOverride lo ricalcola
         /// subito dopo; altrimenti resta nullo e VisualModel ricade sul modello
@@ -804,35 +782,35 @@ namespace MTGAEnhancementSuite.Patches
         }
 
         /// <summary>
-        /// B) Prima dell applicazione: lo stato "stilizzato" diventa "senza
-        /// stile". Tutti gli altri stati passano invariati.
+        /// B) Dopo che Arena ha costruito gli stati della carta esaminata (e
+        /// prima che il chiamante li applichi): se c'e' lo stato semplificato,
+        /// lo selezioniamo.
         ///
         /// Vale anche qui la guardia 6: su una terra base o su una stampa senza
-        /// cornice si lascia <c>Styled</c>, altrimenti la finestra di esame
+        /// cornice si resta su <c>Instance</c>, altrimenti la finestra di esame
         /// mostrerebbe la stessa carta rotta che la patch A non produce piu'.
-        /// Se il modello non si riesce a leggere si riscrive come prima: una
-        /// carta esaminata male e' un inconveniente, non un danno.
+        /// La carta la passa Arena stessa (<c>sourceModel</c>): non serve piu'
+        /// leggerla da un campo privato dell'holder.
         /// </summary>
-        private static void SetExamineState_Prefix(ExamineViewCardHolder __instance, ref ExamineState state)
+        private static void Examine_Postfix(ExamineManager __instance, ICardDataAdapter sourceModel)
         {
-            using var _fc = Diagnostics.FrameCost.Measure("ForceSimplified.ExamineState");
+            using var _fc = Diagnostics.FrameCost.Measure("ForceSimplified.Examine");
             try
             {
                 if (!ModSettings.Instance.ForceSimplifiedCards) return;
-                if (state != ExamineState.Styled) return;
+                if (__instance == null || !__instance.HasSimplifiedState || __instance.IsSimplifiedState) return;
 
-                var esaminata = ModelloEsaminato(__instance);
-                if (esaminata != null)
+                if (sourceModel?.Printing != null)
                 {
-                    var motivo = MotivoEsclusione(esaminata.Printing.Record);
+                    var motivo = MotivoEsclusione(sourceModel.Printing.Record);
                     if (motivo != null)
                     {
-                        DiagEsclusione(esaminata.GrpId, motivo, "finestra di esame");
+                        DiagEsclusione(sourceModel.GrpId, motivo, "finestra di esame");
                         return;
                     }
                 }
 
-                state = ExamineState.Unstyled;
+                __instance.ToggleSimplified();
             }
             catch (Exception ex)
             {

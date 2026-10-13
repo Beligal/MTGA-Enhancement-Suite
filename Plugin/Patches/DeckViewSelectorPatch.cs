@@ -43,6 +43,8 @@ namespace MTGAEnhancementSuite.Patches
         private static FieldInfo _onDeckSelectedField;
         private static FieldInfo _onDeckDoubleClickedField;
         private static FieldInfo _onDeckNameEndEditField;
+        private static FieldInfo _onDeckClickAndHoldField;
+        private static FieldInfo _getCurrentModeField;
 
         // Tracks DeckViewInfos whose NetDeckFolderId we've mutated this call,
         // so the postfix can put them back. Single-call scope; cleared in
@@ -78,6 +80,8 @@ namespace MTGAEnhancementSuite.Patches
             _onDeckSelectedField      = AccessTools.Field(t, "_onDeckSelected");
             _onDeckDoubleClickedField = AccessTools.Field(t, "_onDeckDoubleClicked");
             _onDeckNameEndEditField   = AccessTools.Field(t, "_onDeckNameEndEdit");
+            _onDeckClickAndHoldField  = AccessTools.Field(t, "_onDeckClickAndHold");
+            _getCurrentModeField      = AccessTools.Field(t, "_getCurrentMode");
             if (_folderParentField == null || _deckFoldersField == null)
                 Plugin.Log.LogWarning("DeckViewSelectorPatch: required private fields not found via reflection");
         }
@@ -89,8 +93,20 @@ namespace MTGAEnhancementSuite.Patches
         [HarmonyPatch(typeof(DeckViewSelector), "Initialize")]
         private static void Initialize_Postfix(DeckViewSelector __instance, bool simpleSelect)
         {
-            using (FrameCost.Measure("DeckViewSelector.Initialize"))
-                Initialize_PostfixCore(__instance, simpleSelect);
+            // The catch lives here, not only in the Core: if an Arena update
+            // changes a signature the Core calls, the MissingMethodException
+            // is thrown while JIT-compiling the Core — before its own try is
+            // entered — and would escape into DeckSelectBlade.Init, leaving
+            // the Home play blade half-built (Arena update of 2026-10-13).
+            try
+            {
+                using (FrameCost.Measure("DeckViewSelector.Initialize"))
+                    Initialize_PostfixCore(__instance, simpleSelect);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.LogError($"DeckViewSelectorPatch.Initialize_Postfix: {ex}");
+            }
         }
 
         private static void Initialize_PostfixCore(DeckViewSelector __instance, bool simpleSelect)
@@ -124,6 +140,9 @@ namespace MTGAEnhancementSuite.Patches
                 var onDeckSelected      = new Action<DeckViewInfo>(__instance.SelectDeck);
                 var onDeckDoubleClicked = _onDeckDoubleClickedField?.GetValue(__instance) as Action<DeckViewInfo>;
                 var onDeckNameEndEdit   = _onDeckNameEndEditField?.GetValue(__instance)   as Action<DeckViewInfo, string>;
+                // Multi-select (click-and-hold) wiring, same as native folders.
+                var onDeckClickAndHold  = _onDeckClickAndHoldField?.GetValue(__instance)  as Action<DeckViewInfo>;
+                var getCurrentMode      = _getCurrentModeField?.GetValue(__instance)      as Func<DeckManagerMode>;
 
                 // Use the same prefab MTGA uses for its server-side folders
                 // (My Decks / Starter Decks / Example Decks). Public field.
@@ -147,7 +166,8 @@ namespace MTGAEnhancementSuite.Patches
                     // OnFolderToggle is a private member on DeckViewSelector;
                     // build a no-op delegate matching its signature. MTGA's
                     // selection logic doesn't rely on it firing.
-                    view.Initialize(onDeckSelected, onDeckDoubleClicked, onDeckNameEndEdit, _ => { });
+                    view.Initialize(onDeckSelected, onDeckDoubleClicked, onDeckClickAndHold,
+                        getCurrentMode, onDeckNameEndEdit, _ => { });
                     view.FolderId = folder.Id;
 
                     // Set the visible folder name. MTGA's Localize component
@@ -214,6 +234,11 @@ namespace MTGAEnhancementSuite.Patches
                 view.Initialize(
                     new Action<DeckViewInfo>(instance.SelectDeck),
                     new Action<DeckViewInfo>(Features.LocalDeckController.OnDoubleClick),
+                    // No click-and-hold / manager mode: multi-select acts on
+                    // server decks and our tiles are synthetic. Both are
+                    // null-checked by DeckView.
+                    null,
+                    null,
                     new Action<DeckViewInfo, string>(Features.LocalDeckController.OnNameEdit),
                     _ => { });
                 view.FolderId = LocalFolderId;
