@@ -6,8 +6,8 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using HarmonyLib;
+using MTGAEnhancementSuite.Features.CollectionExport;
 using MTGAEnhancementSuite.UI;
 using MTGAEnhancementSuite.Helpers;
 using UnityEngine;
@@ -15,15 +15,31 @@ using UnityEngine;
 namespace MTGAEnhancementSuite.Features
 {
     /// <summary>
-    /// Exports the player's MTGA collection to a text file in MTGA's deck-list
-    /// format: "<count> <card name> (<SET>) <collector#>".
+    /// Exports the player's MTGA collection in one of the formats of
+    /// <see cref="ExportProfile"/> (Moxfield/Archidekt, ManaBox, MTGGoldfish,
+    /// generic CSV, plain name list).
     ///
     /// Data sources (all resolved at export time, no caching):
     ///   - Pantry.Get&lt;IInventoryServiceWrapper&gt;().Cards — Dictionary&lt;uint,int&gt;
     ///     of grpId → owned-count.
-    ///   - Pantry.Get&lt;CardDatabase&gt;().GetCardRecordById(grpId, null) — returns
-    ///     CardPrintingRecord with TitleId / ExpansionCode / CollectorNumber / Rarity.
-    ///   - CardDatabase.CardTitleProvider.GetCardTitle(titleId, ...) — English name.
+    ///   - CardDatabase.CardDataProvider.GetCardPrintingById(grpId, null) —
+    ///     CardPrintingData with TitleId / ExpansionCode / CollectorNumber /
+    ///     IsToken / IsDigitalOnly / IsRebalanced.
+    ///   - CardDatabase.CardTitleProvider.GetCardTitle(grpId, ...) — English name.
+    ///
+    /// Questo file fa solo il lato Arena: legge l'inventario e il database
+    /// delle carte e li consegna come <see cref="ArenaCard"/>. Identificazione
+    /// delle stampe (indice Scryfall), modello comune e formati stanno in
+    /// Features/CollectionExport, senza Unity, e si provano da
+    /// tests/CollectionExport.Tests.
+    ///
+    /// **Riscritto il 2026-10-14.** Prima il file era "copie nome", sommato
+    /// per NOME: set e numero letti e buttati, le stampe diverse fuse in una
+    /// riga, le split card scritte col separatore di Arena (" /// ") che
+    /// nessun sito riconosce, le carte Alchemy fuse con la loro versione
+    /// cartacea (lo sprite "A" veniva tolto insieme ai tag), e le carte senza
+    /// nome scartate con una riga di log e nient'altro. Quel formato resta
+    /// come "Name list", per chi lo usava per incollare nomi.
     ///
     /// File save uses native Win32 GetSaveFileNameW (comdlg32) so we don't need
     /// System.Windows.Forms or Microsoft.Win32 references — both are missing
@@ -31,21 +47,38 @@ namespace MTGAEnhancementSuite.Features
     /// </summary>
     internal static class CollectionExporter
     {
+        /// <summary>Cosa e' stato scritto, per il riepilogo della finestra.</summary>
+        internal sealed class Result
+        {
+            public string Path;
+            public ExportProfile Profile;
+            public CollectionExportModel Model;
+            public ProfileOutput Output;
+        }
+
         // -------- Public entry point --------
 
-        /// <summary>
-        /// Public entry point. If the inventory cache is already populated we
-        /// export synchronously. Otherwise we fire GetPlayerCards(0) to fetch
-        /// from MTGA's server, poll the returned Promise, then export.
-        /// </summary>
+        /// <summary>Il pulsante del pannello: apre la finestra, dove si sceglie il formato.</summary>
         public static void Export()
+        {
+            UI.CollectionExportWindow.Show();
+        }
+
+        /// <summary>
+        /// Esporta nel formato scelto. If the inventory cache is already
+        /// populated we export synchronously. Otherwise we fire
+        /// GetPlayerCards(0) to fetch from MTGA's server, poll the returned
+        /// Promise, then export. <paramref name="done"/> arriva solo a file
+        /// scritto; gli errori li dice un Toast, come prima.
+        /// </summary>
+        public static void Run(ExportProfile profile, ScryfallArenaIndex index, Action<Result> done)
         {
             try
             {
                 var cards = ResolveOwnedCards();
                 if (cards != null && cards.Count > 0)
                 {
-                    DoExport();
+                    Finish(cards, profile, index, done);
                     return;
                 }
 
@@ -63,7 +96,7 @@ namespace MTGAEnhancementSuite.Features
                     return;
                 }
                 Toast.Info("Fetching collection from server…");
-                host.StartCoroutine(FetchThenExport());
+                host.StartCoroutine(FetchThenExport(profile, index, done));
             }
             catch (Exception ex)
             {
@@ -83,7 +116,7 @@ namespace MTGAEnhancementSuite.Features
         /// Falls back to reading Promise.Result.cards directly if Cards stays
         /// empty (e.g. cacheVersion didn't change).
         /// </summary>
-        private static IEnumerator FetchThenExport()
+        private static IEnumerator FetchThenExport(ExportProfile profile, ScryfallArenaIndex index, Action<Result> done)
         {
             object inventoryManager = ResolveInventoryManager();
             if (inventoryManager == null)
@@ -162,7 +195,7 @@ namespace MTGAEnhancementSuite.Features
                 yield break;
             }
 
-            DoExportWithCards(cards);
+            Finish(cards, profile, index, done);
         }
 
         /// <summary>Reflectively walks promise.Result.cards (a Dictionary&lt;uint,int&gt;).</summary>
@@ -178,44 +211,64 @@ namespace MTGAEnhancementSuite.Features
         }
 
         /// <summary>
-        /// Captures the (now-loaded) collection, shows the save dialog, writes
-        /// the file. Called from both the fast path (cache hit) and the
-        /// post-fetch path. The save dialog blocks the main thread for its
-        /// duration — that's normal Windows OFN behavior.
+        /// Captures the (now-loaded) collection, builds the chosen format,
+        /// shows the save dialog, writes the file. Called from both the fast
+        /// path (cache hit) and the post-fetch path. The save dialog blocks the
+        /// main thread for its duration — that's normal Windows OFN behavior.
         /// </summary>
-        private static void DoExport()
-        {
-            DoExportWithCards(null);
-        }
-
-        private static void DoExportWithCards(IDictionary<uint, int> overrideCards)
+        private static void Finish(IDictionary<uint, int> cards, ExportProfile profile,
+                                   ScryfallArenaIndex index, Action<Result> done)
         {
             try
             {
-                var lines = BuildExportLines(overrideCards, out int totalCards, out int distinctCards);
-                if (lines == null || lines.Count == 0)
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var arenaCards = ReadArenaCards(cards);
+                if (arenaCards == null)
                 {
-                    Toast.Warning("No cards returned — your collection appears empty");
-                    Plugin.Log.LogWarning("CollectionExporter: BuildExportLines returned empty");
+                    Toast.Error("Export failed: card database not available — see log");
                     return;
                 }
 
-                var defaultName = $"mtga_collection_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
-                var defaultDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                var model = CollectionMapper.Build(arenaCards, index);
+                if (model.CopiesIn == 0)
+                {
+                    Toast.Warning("No cards returned — your collection appears empty");
+                    Plugin.Log.LogWarning("CollectionExporter: inventory has no positive counts");
+                    return;
+                }
+                var output = profile.Write(model);
+                sw.Stop();
 
-                if (!ShowSaveDialog(defaultName, defaultDir, out string path))
+                // Il log dice cosa e' stato esaminato, non solo l'esito
+                // (regola 19): copie lette, dove sono finite, e quanto e' costato.
+                Plugin.Log.LogInfo(
+                    $"CollectionExporter: {profile.Id}: read {cards.Count} entries / {model.CopiesIn} copies; " +
+                    $"rows {model.Rows.Count} (arena_id {model.CopiesWith(MatchPrecision.ArenaId)}, " +
+                    $"set+number {model.CopiesWith(MatchPrecision.SetAndNumber)}, name only {model.CopiesWith(MatchPrecision.NameOnly)} copies); " +
+                    $"skipped {model.CopiesSkipped}; not in format {output.Rejected.Sum(r => r.Quantity)}; " +
+                    $"file {output.DataLines} lines / {output.CopiesWritten} copies; " +
+                    $"Scryfall index {(index != null ? index.Count + " prints" : "none")}; {sw.ElapsedMilliseconds} ms");
+                foreach (var s in model.Skipped)
+                    Plugin.Log.LogInfo($"CollectionExporter:   skipped grpId {s.GrpId} x{s.Count} {s.Name}: {s.Reason}");
+
+                var defaultDir = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                if (!ShowSaveDialog(profile.FileName, defaultDir, profile.FileFilter, profile.Extension, out string path))
                 {
                     Plugin.Log.LogInfo("CollectionExporter: user cancelled save dialog");
                     return;
                 }
 
-                File.WriteAllText(path, string.Join("\n", lines) + "\n");
-                Toast.Success($"Exported {distinctCards} cards ({totalCards} copies) to {Path.GetFileName(path)}");
-                Plugin.Log.LogInfo($"CollectionExporter: wrote {path} ({distinctCards} cards / {totalCards} copies)");
+                // UTF-8 senza BOM: vedi ExportProfile, il BOM rovina il nome
+                // della prima colonna per chi lo confronta alla lettera.
+                File.WriteAllText(path, output.Text, new UTF8Encoding(false));
+                Toast.Success($"Exported {output.CopiesWritten} copies ({output.DataLines} lines) to {Path.GetFileName(path)}");
+                Plugin.Log.LogInfo($"CollectionExporter: wrote {path}");
+
+                done?.Invoke(new Result { Path = path, Profile = profile, Model = model, Output = output });
             }
             catch (Exception ex)
             {
-                Plugin.Log.LogError($"CollectionExporter.DoExport failed: {ex}");
+                Plugin.Log.LogError($"CollectionExporter.Finish failed: {ex}");
                 Toast.Error($"Export failed: {ex.Message}");
             }
         }
@@ -223,23 +276,14 @@ namespace MTGAEnhancementSuite.Features
         // -------- Data extraction --------
 
         /// <summary>
-        /// Builds the deck-list lines for every owned card. Returns null on
-        /// fatal lookup failure (so we can show a warning instead of saving
-        /// an empty file).
+        /// Every inventory entry as an <see cref="ArenaCard"/>, including the
+        /// ones Arena can't describe (InArenaDatabase = false): deciding what to
+        /// drop is the mapper's job, and it reports it. Returns null on fatal
+        /// lookup failure (so we can show an error instead of saving an empty
+        /// file).
         /// </summary>
-        private static List<string> BuildExportLines(IDictionary<uint, int> overrideCards,
-            out int totalCards, out int distinctCards)
+        private static List<ArenaCard> ReadArenaCards(IDictionary<uint, int> cards)
         {
-            totalCards = 0;
-            distinctCards = 0;
-
-            var cards = overrideCards ?? ResolveOwnedCards();
-            if (cards == null || cards.Count == 0)
-            {
-                Plugin.Log.LogWarning("CollectionExporter: IInventoryServiceWrapper.Cards is null/empty");
-                return null;
-            }
-
             object cardDb = ResolveCardDatabase();
             if (cardDb == null)
             {
@@ -271,8 +315,9 @@ namespace MTGAEnhancementSuite.Features
             //                         string overrideLanguageCode = null)
             // Note that the first arg is GRP ID, not title id — the provider
             // internally calls GetCardRecordById(grpId) and pulls TitleId out.
-            // We force overrideLanguageCode = "enUS" so the export is always
-            // English regardless of the user's MTGA locale.
+            // We force the language to "en-US" so the export is always English
+            // regardless of the user's MTGA locale ("enUS" throws: the keys of
+            // GreLocProvider's ShortLangCodes are dashed).
             var titleProviderProp = AccessTools.Property(cardDb.GetType(), "CardTitleProvider");
             object titleProvider = titleProviderProp?.GetValue(cardDb);
             MethodInfo getCardTitle = null;
@@ -296,41 +341,48 @@ namespace MTGAEnhancementSuite.Features
                     new[] { typeof(uint), typeof(string), typeof(bool) });
             }
 
-            // Aggregate counts by cleaned-name, summing across printings. The
-            // user-facing format is "<count> <name>" — set/collector# get
-            // stripped because most deckbuilders just want a name list.
-            var byName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            int unresolved = 0;
+            // Le PropertyInfo si cercano una volta per tipo, non una per carta:
+            // una collezione sono migliaia di voci.
+            Type printingType = null;
+            PropertyInfo pToken = null, pTitleId = null, pSet = null, pNumber = null, pDigital = null, pRebalanced = null;
+
+            var result = new List<ArenaCard>(cards.Count);
+            int notInDb = 0;
             foreach (var kv in cards)
             {
                 uint grpId = kv.Key;
-                int count = kv.Value;
-                if (count <= 0) continue;
+                var card = new ArenaCard { GrpId = grpId, Count = kv.Value };
+                result.Add(card);
+                if (kv.Value <= 0) continue;
 
-                object printing;
+                object printing = null;
                 try { printing = getCardPrinting.Invoke(cardDataProvider, new object[] { grpId, null }); }
                 catch (Exception ex)
                 {
                     Plugin.Log.LogWarning($"CollectionExporter: GetCardPrintingById({grpId}) threw: {ex.Message}");
-                    unresolved++;
-                    continue;
                 }
-                if (printing == null) { unresolved++; continue; }
-                var printingType = printing.GetType();
+                if (printing == null) { card.InArenaDatabase = false; notInDb++; continue; }
 
-                // Skip tokens — they show up in the inventory dictionary but
-                // aren't deck-listable.
-                var isTokenProp = AccessTools.Property(printingType, "IsToken");
-                if (isTokenProp != null && (bool)isTokenProp.GetValue(printing)) continue;
+                if (printing.GetType() != printingType)
+                {
+                    printingType = printing.GetType();
+                    pToken = AccessTools.Property(printingType, "IsToken");
+                    pTitleId = AccessTools.Property(printingType, "TitleId");
+                    pSet = AccessTools.Property(printingType, "ExpansionCode");
+                    pNumber = AccessTools.Property(printingType, "CollectorNumber");
+                    pDigital = AccessTools.Property(printingType, "IsDigitalOnly");
+                    pRebalanced = AccessTools.Property(printingType, "IsRebalanced");
+                }
 
-                string name = "Unknown";
-                var titleIdProp = AccessTools.Property(printingType, "TitleId");
+                card.IsToken = pToken != null && (bool)pToken.GetValue(printing);
+                card.ArenaSetCode = pSet?.GetValue(printing) as string;
+                card.CollectorNumber = pNumber?.GetValue(printing) as string;
+                card.IsDigitalOnly = pDigital != null && (bool)pDigital.GetValue(printing);
+                card.IsRebalanced = pRebalanced != null && (bool)pRebalanced.GetValue(printing);
 
-                // Try CardTitleProvider.GetCardTitle(grpId, formatted=true, lang=null).
-                // We pass null for lang — that uses Languages.CurrentLanguage,
-                // which is "en-US" by default. Passing the literal "enUS"
-                // throws KeyNotFoundException inside GreLocProvider's
-                // ShortLangCodes lookup (the keys are dashed: "en-US").
+                // Il nome GREZZO, coi tag: e' il mapper a ripulirlo, perche'
+                // lo sprite "A" delle carte Alchemy va riconosciuto (via
+                // IsRebalanced) e non solo tolto, e " /// " va tradotto.
                 if (getCardTitle != null && titleProvider != null)
                 {
                     try
@@ -339,9 +391,7 @@ namespace MTGAEnhancementSuite.Features
                             new object[] { grpId, /*formatted*/ true, /*lang*/ "en-US" }) as string;
                         if (!string.IsNullOrEmpty(resolved) &&
                             !resolved.StartsWith("Unknown Card Title", StringComparison.Ordinal))
-                        {
-                            name = resolved;
-                        }
+                            card.Name = resolved;
                     }
                     catch (Exception ex)
                     {
@@ -349,12 +399,9 @@ namespace MTGAEnhancementSuite.Features
                     }
                 }
 
-                // Fallback: pull the title text directly via GreLocProvider on the
-                // printing's TitleId. Catches cards CardTitleProvider can't resolve
-                // (e.g. brand-new printings without a CardPrintingRecord match).
-                if (name == "Unknown" && titleIdProp != null && getLocalizedText != null && locProvider != null)
+                if (card.Name == null && pTitleId != null && getLocalizedText != null && locProvider != null)
                 {
-                    uint titleId = (uint)titleIdProp.GetValue(printing);
+                    uint titleId = (uint)pTitleId.GetValue(printing);
                     if (titleId != 0)
                     {
                         try
@@ -363,9 +410,7 @@ namespace MTGAEnhancementSuite.Features
                                 new object[] { titleId, /*overrideLang*/ "en-US", /*formatted*/ true }) as string;
                             if (!string.IsNullOrEmpty(resolved) &&
                                 !resolved.StartsWith("Unknown Card Title", StringComparison.Ordinal))
-                            {
-                                name = resolved;
-                            }
+                                card.Name = resolved;
                         }
                         catch (Exception ex)
                         {
@@ -373,52 +418,13 @@ namespace MTGAEnhancementSuite.Features
                         }
                     }
                 }
-
-                // Strip TMP rich-text markup. MTGA's localizations embed:
-                //   <nobr>...</nobr>             — non-breaking spans on
-                //                                  hyphenated names like
-                //                                  "Agate-Blade Assassin".
-                //   <sprite="..." name="...">    — Alchemy "A" badge / etc.
-                //   <color=...>...</color>, <i>, <b>, etc.
-                // None of these belong in a deckbuilder paste, so strip
-                // every angle-bracket tag and collapse the whitespace.
-                name = StripRichText(name);
-                if (string.IsNullOrEmpty(name) || name == "Unknown") continue;
-
-                if (byName.TryGetValue(name, out var existing))
-                    byName[name] = existing + count;
-                else
-                    byName[name] = count;
-                totalCards += count;
             }
 
-            distinctCards = byName.Count;
-
-            if (unresolved > 0)
-                Plugin.Log.LogInfo($"CollectionExporter: {unresolved} grpIds had no CardPrintingRecord — skipped");
-
-            // Sort alphabetically — most deckbuilder paste boxes accept any
-            // order, but alphabetical reads better when the user opens the file.
-            var lines = byName
-                .OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(kv => $"{kv.Value} {kv.Key}")
-                .ToList();
-            return lines;
-        }
-
-        // Matches every <...> tag (TMP rich text + sprite + color + nobr).
-        private static readonly Regex RichTextTagRx = new Regex(
-            @"<[^>]*>", RegexOptions.Compiled);
-        // Compress runs of whitespace to a single space.
-        private static readonly Regex WhitespaceRunRx = new Regex(
-            @"\s+", RegexOptions.Compiled);
-
-        private static string StripRichText(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return s;
-            var stripped = RichTextTagRx.Replace(s, "");
-            stripped = WhitespaceRunRx.Replace(stripped, " ").Trim();
-            return stripped;
+            if (notInDb > 0)
+                Plugin.Log.LogInfo($"CollectionExporter: {notInDb} grpIds had no printing in the Arena card database");
+            if (printingType != null && (pSet == null || pNumber == null || pRebalanced == null))
+                Plugin.Log.LogWarning($"CollectionExporter: {printingType.FullName} is missing ExpansionCode/CollectorNumber/IsRebalanced — Arena changed?");
+            return result;
         }
 
         // -------- Pantry lookups --------
@@ -543,7 +549,8 @@ namespace MTGAEnhancementSuite.Features
         private const int OFN_HIDEREADONLY    = 0x00000004;
         private const int OFN_EXPLORER        = 0x00080000;
 
-        private static bool ShowSaveDialog(string defaultName, string initialDir, out string chosenPath)
+        private static bool ShowSaveDialog(string defaultName, string initialDir, string filter, string extension,
+                                           out string chosenPath)
         {
             chosenPath = null;
             // The OS writes back into ofn.lpstrFile, so we need a buffer
@@ -554,12 +561,12 @@ namespace MTGAEnhancementSuite.Features
 
             var ofn = new OPENFILENAME
             {
-                lpstrFilter = "Text files (*.txt)\0*.txt\0All files (*.*)\0*.*\0\0",
+                lpstrFilter = filter,
                 lpstrFile = buf,
                 nMaxFile = 260,
                 lpstrInitialDir = initialDir,
                 lpstrTitle = "Export MTGA Collection",
-                lpstrDefExt = "txt",
+                lpstrDefExt = extension,
                 Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_EXPLORER,
             };
 
@@ -570,8 +577,10 @@ namespace MTGAEnhancementSuite.Features
             // null-terminated. Trim padding.
             chosenPath = (ofn.lpstrFile ?? "").TrimEnd('\0');
             if (string.IsNullOrEmpty(chosenPath)) return false;
-            // Force .txt if user typed no extension and OFN_DEFEXT didn't append
-            if (!chosenPath.Contains(".")) chosenPath += ".txt";
+            // Force the extension if the user typed none and OFN_DEFEXT didn't
+            // append it. Si guarda il NOME del file: un punto in una cartella
+            // del percorso non e' un'estensione.
+            if (!Path.GetFileName(chosenPath).Contains(".")) chosenPath += "." + extension;
             return true;
         }
     }

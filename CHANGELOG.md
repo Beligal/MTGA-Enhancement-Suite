@@ -9,6 +9,34 @@ it; the full diff is in `git log`.
 
 ---
 
+## 0.24.0 — 2026-10-14
+
+### Changed
+
+**Collection export, rewritten for collection sites.** **Export…** in the
+Settings panel now opens a window where you choose the format: Moxfield /
+Archidekt (the default), ManaBox, MTGGoldfish, a generic CSV, or the old plain
+name list. The old file had problems that made it unusable for importing a
+collection:
+
+- every printing of a card was added into one line by name, so set and
+  collector number were lost;
+- split cards were written the way Arena spells them (`Dusk /// Dawn`), which
+  no site recognises (`Dusk // Dawn`);
+- Alchemy rebalanced cards lost their "A-" and were counted as the paper card;
+- cards without a name were dropped with a line in the log and nothing on
+  screen.
+
+Each card is now matched to its exact printing through Scryfall's list of
+Arena printings, downloaded once from the window and kept on disk. The match
+is checked by name too: Scryfall's own records point a few Arena ids at the
+wrong card, and those are not trusted. When a card cannot be matched it is
+exported by name and listed in the summary with the reason. Without the
+download, everything is exported by name. Nothing is invented: no condition,
+language, foil or price.
+
+---
+
 ## 0.23.1 — 2026-10-13
 
 Compatibility release for the Arena update of 2026-10-13. No new features.

@@ -1,0 +1,102 @@
+{
+ "object": "list",
+ "total_cards": 15,
+ "has_more": true,
+ "next_page": "https://api.scryfall.com/cards/search?page=2",
+ "data": [
+  {
+   "object": "card",
+   "id": "74d8b644-4cca-451e-a46c-5237c13bf373",
+   "oracle_id": "3d63ad3a-4e9f-4968-a576-4be063f4ecbf",
+   "arena_id": 64319,
+   "name": "Battle at the Bridge",
+   "layout": "normal",
+   "set": "aer",
+   "set_name": "Aether Revolt",
+   "collector_number": "53",
+   "digital": false
+  },
+  {
+   "object": "card",
+   "id": "b23d6985-f3ee-409c-8a81-05d2d84e2da4",
+   "oracle_id": "f34b9bc4-7bfe-47fd-ba23-4eeeb46026eb",
+   "arena_id": 74995,
+   "name": "Lightning Strike",
+   "layout": "normal",
+   "set": "ajmp",
+   "set_name": "Jumpstart Arena Exclusives",
+   "collector_number": "152",
+   "digital": true
+  },
+  {
+   "object": "card",
+   "id": "7f6ebc44-b141-4119-be29-0285a56f644c",
+   "oracle_id": "7bc3f92f-68a2-4934-afc4-89f6d0e8cf98",
+   "arena_id": 73788,
+   "name": "Dusk // Dawn",
+   "layout": "split",
+   "set": "akr",
+   "set_name": "Amonkhet Remastered",
+   "collector_number": "16",
+   "digital": true,
+   "card_faces": [
+    {
+     "object": "card_face",
+     "name": "Dusk"
+    },
+    {
+     "object": "card_face",
+     "name": "Dawn"
+    }
+   ]
+  },
+  {
+   "object": "card",
+   "id": "4139383e-6c7c-4053-8e89-8b601e4ae98e",
+   "oracle_id": "4e769107-0f32-4181-9e57-ffebc2228d3a",
+   "arena_id": 68773,
+   "name": "Rise from the Grave",
+   "layout": "normal",
+   "set": "ana",
+   "set_name": "Arena New Player Experience",
+   "collector_number": "38",
+   "digital": true
+  },
+  {
+   "object": "card",
+   "id": "cbe639bb-5797-4bec-b55b-aed296337e92",
+   "oracle_id": "7f77a84e-5a4b-4834-aefa-3cecc175ae8e",
+   "arena_id": 91882,
+   "name": "Jace, the Mind Sculptor",
+   "layout": "normal",
+   "set": "blc",
+   "set_name": "Bloomburrow Commander",
+   "collector_number": "75",
+   "digital": false
+  },
+  {
+   "object": "card",
+   "id": "7d541125-bfb8-4f88-8bf3-ad7b6af7ad1d",
+   "oracle_id": "f34b9bc4-7bfe-47fd-ba23-4eeeb46026eb",
+   "arena_id": 82189,
+   "name": "Lightning Strike",
+   "layout": "normal",
+   "set": "dmu",
+   "set_name": "Dominaria United",
+   "collector_number": "137",
+   "digital": false
+  },
+  {
+   "object": "card",
+   "id": "3027347d-5fd3-47cd-83d4-8c834e00794c",
+   "oracle_id": "4efcdefc-e49d-4bce-8581-69037bb48c0a",
+   "arena_id": 82271,
+   "name": "Sol'Kanar the Tainted",
+   "layout": "normal",
+   "set": "dmu",
+   "set_name": "Dominaria United",
+   "collector_number": "219",
+   "digital": false
+  }
+ ]
+}

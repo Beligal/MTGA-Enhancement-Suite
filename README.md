@@ -6,7 +6,8 @@
 A [BepInEx 5](https://github.com/BepInEx/BepInEx) mod for **Magic: The Gathering Arena** (Windows) that adds deck- and collection-management tools Wizards of the Coast hasn't built into the game.
 
 Everything it does runs on your own machine: no account, no server, no network
-calls of its own beyond checking this repository for updates.
+calls of its own beyond checking this repository for updates and, only when you
+click Download in the collection export, fetching Scryfall's list of Arena cards.
 
 **[Join us on Discord](https://discord.gg/4smsxMYAp)**
 
@@ -276,9 +277,37 @@ or delete them in bulk. Local decks live as plain text files on your machine
 Arena's own limit and edit them outside the game.
 
 ### Collection Export
-Writes your whole collection to a text file in Arena's deck-list format
-(`4 Card Name (SET) 123`), ready to paste into a deckbuilding site or keep as a
-backup. In the **MTGA+** panel, under Settings.
+Saves your whole Arena collection as a CSV file for a collection site, or as a
+backup. In the **MTGA+** panel, under Settings: **Export…** opens a window
+where you pick the format.
+
+| Format | File | How to import it |
+|---|---|---|
+| **Moxfield / Archidekt** (default) | `MTGA-Collection-Moxfield.csv` | Moxfield: Collection → Import, format *Moxfield*, location *Arena*. Archidekt: Collection → Import, preset *Moxfield* |
+| **ManaBox** | `MTGA-Collection-ManaBox.csv` | ManaBox: Collection → Import → CSV |
+| **MTGGoldfish** | `MTGA-Collection-MTGGoldfish.csv` | MTGGoldfish: Collection → Import, format *MTGGoldfish* |
+| **Generic CSV** | `MTGA-Collection.csv` | Not for a particular site: every identifier we have, Arena and Scryfall side by side, and how each card was matched |
+| **Name list** | `MTGA-Collection-Names.txt` | One `4 Card Name` line per card, all printings added up, for pasting into a deckbuilder |
+
+**Exact printings need a one-time download.** Arena's card ids are not the ones
+the sites use. The window can download Scryfall's list of Arena printings
+(about a minute and a half, saved in `%APPDATA%\MTGAEnhancementSuite\scryfall`); with
+it, each card is exported with its set and collector number. Without it, cards
+are exported by name only, and the site picks a printing. Update the list after
+a new Arena set comes out.
+
+After saving, the window says how many copies went into the file, how many were
+matched exactly, which ones only by name and why, and which ones the format
+could not hold (ManaBox and MTGGoldfish need a set, so name-only cards are left
+out of those two files — Moxfield and Generic CSV keep them).
+
+Good to know:
+- Your Arena collection is **digital**. Sites built for paper may treat the file
+  as physical cards (prices, trade lists). No condition, language, foil or price
+  is written: Arena has none of them, and cosmetic styles are not foils.
+- **Alchemy** (rebalanced "A-" cards) and other digital-only printings may not
+  be known to a paper-oriented site.
+- Tokens are not collectible cards and are left out.
 
 ### Gameplay Settings
 Click the **MTGA+** button in the navigation bar to open the panel:

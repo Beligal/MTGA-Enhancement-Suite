@@ -1,0 +1,133 @@
+{
+ "object": "list",
+ "total_cards": 15,
+ "has_more": false,
+ "data": [
+  {
+   "object": "card",
+   "id": "645cfc1b-76f2-4823-9fb0-03cb009f8b32",
+   "oracle_id": "ed66cd31-958f-4b28-82a3-e04acc819afc",
+   "arena_id": 67330,
+   "name": "Yargle, Glutton of Urborg",
+   "layout": "normal",
+   "set": "dom",
+   "set_name": "Dominaria",
+   "collector_number": "113",
+   "digital": false
+  },
+  {
+   "object": "card",
+   "id": "09fd2d9c-1793-4beb-a3fb-7a869f660cd4",
+   "oracle_id": "d6d72f5f-8f5d-4180-b514-f22ff5482902",
+   "arena_id": 70262,
+   "name": "Bonecrusher Giant // Stomp",
+   "layout": "adventure",
+   "set": "eld",
+   "set_name": "Throne of Eldraine",
+   "collector_number": "115",
+   "digital": false,
+   "card_faces": [
+    {
+     "object": "card_face",
+     "name": "Bonecrusher Giant"
+    },
+    {
+     "object": "card_face",
+     "name": "Stomp"
+    }
+   ]
+  },
+  {
+   "object": "card",
+   "id": "bc73644e-884c-47cd-aeec-ab80360dd5ae",
+   "oracle_id": "4e769107-0f32-4181-9e57-ffebc2228d3a",
+   "arena_id": 67914,
+   "name": "Rise from the Grave",
+   "layout": "normal",
+   "set": "m19",
+   "set_name": "Core Set 2019",
+   "collector_number": "117",
+   "digital": false
+  },
+  {
+   "object": "card",
+   "id": "084b7337-c06f-4cbf-8fc0-0b20c221f1dc",
+   "oracle_id": "f34b9bc4-7bfe-47fd-ba23-4eeeb46026eb",
+   "arena_id": 67984,
+   "name": "Lightning Strike",
+   "layout": "normal",
+   "set": "m19",
+   "set_name": "Core Set 2019",
+   "collector_number": "152",
+   "digital": false
+  },
+  {
+   "object": "card",
+   "id": "24c0d87b-0049-4beb-b9cb-6f813b7aa7dc",
+   "oracle_id": "c0957e5e-c71b-439c-931c-9f55d2f76ace",
+   "arena_id": 79570,
+   "name": "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki",
+   "layout": "transform",
+   "set": "neo",
+   "set_name": "Kamigawa: Neon Dynasty",
+   "collector_number": "141",
+   "digital": false,
+   "card_faces": [
+    {
+     "object": "card_face",
+     "name": "Fable of the Mirror-Breaker"
+    },
+    {
+     "object": "card_face",
+     "name": "Reflection of Kiki-Jiki"
+    }
+   ]
+  },
+  {
+   "object": "card",
+   "id": "0b696cd1-0d72-4df5-bacc-dc77e62f9a13",
+   "oracle_id": "c0957e5e-c71b-439c-931c-9f55d2f76ace",
+   "arena_id": 79848,
+   "name": "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki",
+   "layout": "transform",
+   "set": "neo",
+   "set_name": "Kamigawa: Neon Dynasty",
+   "collector_number": "357",
+   "digital": false,
+   "card_faces": [
+    {
+     "object": "card_face",
+     "name": "Fable of the Mirror-Breaker"
+    },
+    {
+     "object": "card_face",
+     "name": "Reflection of Kiki-Jiki"
+    }
+   ]
+  },
+  {
+   "object": "card",
+   "id": "6ed06252-ee22-4300-90ce-9f51daa09528",
+   "oracle_id": "3d63ad3a-4e9f-4968-a576-4be063f4ecbf",
+   "arena_id": 64319,
+   "name": "Battle at the Bridge",
+   "layout": "normal",
+   "set": "pa1",
+   "set_name": "Pioneer Anthology 1",
+   "collector_number": "2",
+   "digital": true
+  },
+  {
+   "object": "card",
+   "id": "f0f55dee-7e39-4183-8e74-844d9c299bf5",
+   "oracle_id": "f34b9bc4-7bfe-47fd-ba23-4eeeb46026eb",
+   "arena_id": 66263,
+   "name": "Lightning Strike",
+   "layout": "normal",
+   "set": "xln",
+   "set_name": "Ixalan",
+   "collector_number": "149",
+   "digital": false
+  }
+ ]
+}

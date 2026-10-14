@@ -1,0 +1,74 @@
+{
+ "object": "list",
+ "has_more": false,
+ "data": [
+  {
+   "object": "set",
+   "code": "pa1",
+   "name": "Pioneer Anthology 1"
+  },
+  {
+   "object": "set",
+   "code": "blc",
+   "name": "Bloomburrow Commander",
+   "mtgo_code": "blc"
+  },
+  {
+   "object": "set",
+   "code": "dmu",
+   "name": "Dominaria United",
+   "mtgo_code": "dmu"
+  },
+  {
+   "object": "set",
+   "code": "neo",
+   "name": "Kamigawa: Neon Dynasty",
+   "mtgo_code": "neo"
+  },
+  {
+   "object": "set",
+   "code": "akr",
+   "name": "Amonkhet Remastered"
+  },
+  {
+   "object": "set",
+   "code": "ajmp",
+   "name": "Jumpstart Arena Exclusives"
+  },
+  {
+   "object": "set",
+   "code": "eld",
+   "name": "Throne of Eldraine",
+   "mtgo_code": "eld"
+  },
+  {
+   "object": "set",
+   "code": "ana",
+   "name": "Arena New Player Experience"
+  },
+  {
+   "object": "set",
+   "code": "m19",
+   "name": "Core Set 2019",
+   "mtgo_code": "m19"
+  },
+  {
+   "object": "set",
+   "code": "dom",
+   "name": "Dominaria",
+   "mtgo_code": "dar"
+  },
+  {
+   "object": "set",
+   "code": "xln",
+   "name": "Ixalan",
+   "mtgo_code": "xln"
+  },
+  {
+   "object": "set",
+   "code": "aer",
+   "name": "Aether Revolt",
+   "mtgo_code": "aer"
+  }
+ ]
+}

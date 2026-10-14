@@ -203,12 +203,12 @@ namespace MTGAEnhancementSuite.UI
                     Toast.Info(val ? "Cards in deck hidden" : "Cards in deck shown");
                 });
 
-            // Export collection — opens a Windows save dialog and writes the
-            // owned cards in MTGA deck-list format. Useful for backing up
-            // the collection or pasting into deckbuilders.
+            // Export collection — opens the export window (format choice,
+            // Scryfall index, summary), which then shows the Windows save
+            // dialog. See UI/CollectionExportWindow.cs.
             CreateActionRow(_settingsContent.transform, "ExportCollectionRow",
                 "Export Collection",
-                "Save your owned cards to a text file (MTGA deck format) — for sharing with deckbuilders or backing up your collection.",
+                "Save your owned cards as CSV for Moxfield, Archidekt, ManaBox or MTGGoldfish, or as a backup.",
                 // Risalita di un passo (0.109) il 2026-09-21, quando la riga
                 // sopra e' stata tolta: le ancore sono a mano, quindi togliere
                 // una riga in mezzo lascia un buco se non si spostano quelle

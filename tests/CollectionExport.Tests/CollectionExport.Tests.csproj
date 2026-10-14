@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Banco di prova dell'export della collezione, fuori dal gioco.
+
+       Compila gli STESSI file del plugin (Features/CollectionExport), che non
+       contengono Unity ne' tipi di Arena: e' la regola 44 di MISTAKES.md.
+       Nessun pacchetto NuGet: e' un programma che esce con 1 se una verifica
+       fallisce. Newtonsoft.Json e' quella di Arena, la stessa che usa il
+       plugin.
+
+       Non sta nella .sln di proposito: `dotnet build` dalla radice continua a
+       compilare solo plugin e bootstrapper. Come lanciarlo: README.md qui
+       accanto (i comandi contengono un doppio trattino, che in un commento
+       XML non si puo' scrivere). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>MTGAEnhancementSuite.Tests</RootNamespace>
+    <!-- HttpWebRequest e' obsoleto su .NET 9 ma e' quello che c'e' nel Mono
+         di Arena (lo usa anche AutoUpdater): l'avviso qui non riguarda il plugin. -->
+    <NoWarn>$(NoWarn);SYSLIB0014</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Plugin\Features\CollectionExport\*.cs" Link="Under test\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(MTGAManaged)\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
