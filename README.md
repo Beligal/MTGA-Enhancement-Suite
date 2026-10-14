@@ -8,6 +8,9 @@ A [BepInEx 5](https://github.com/BepInEx/BepInEx) mod for **Magic: The Gathering
 Everything it does runs on your own machine: no account, no server, no network
 calls of its own beyond checking this repository for updates.
 
+**[Join us on Discord](https://discord.gg/4smsxMYAp)**
+
+
 Bugs and questions: **[open an issue](https://github.com/Beligal/MTGA-Enhancement-Suite/issues)**.
 
 > **Beta** — This mod is in active development. Expect rough edges.
